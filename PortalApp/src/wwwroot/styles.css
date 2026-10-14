@@ -34,7 +34,7 @@
   --card-pad: 16px;
   --fs-sm: 12px;
   --row-h: 38px;
-  --sidebar: 256px;
+  --sidebar: 300px;
   --header: 58px;
   --radius: 10px;
   --radius-sm: 7px;
@@ -132,7 +132,9 @@ aside .cat { padding: 12px 12px 5px; font-size: 11px; text-transform: uppercase;
 aside .tpl {
   padding: 7px 12px 7px 20px; cursor: pointer; color: var(--fg); border-radius: 8px; font-size: 13.5px;
   position: relative; transition: background .12s;
+  white-space: nowrap;   /* mỗi báo cáo nằm trọn trên 1 dòng */
 }
+aside { overflow-x: auto; }   /* nếu có tên quá dài vẫn cuộn ngang được thay vì cắt chữ */
 aside .tpl:hover { background: var(--muted); }
 aside .tpl.active { background: var(--info-bg); color: var(--primary-700); font-weight: 700; }
 aside .tpl.active::before { content: ""; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width: 4px; height: 16px; border-radius: 3px; background: var(--primary); }
