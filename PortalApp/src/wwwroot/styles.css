@@ -195,7 +195,7 @@ tbody tr { transition: background .1s; }
 tbody tr:hover { background: #F1F6FF; }
 tbody tr.sel { background: var(--info-bg); }
 td { color: var(--fg); }
-td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.num { text-align: left; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 td.cell-copy { cursor: copy; }
 td.cell-copy:hover { background: #e0e7ff; }
 .chk { width: 34px; text-align: center; }
