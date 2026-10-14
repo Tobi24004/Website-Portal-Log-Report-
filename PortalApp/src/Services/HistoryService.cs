@@ -21,6 +21,10 @@ public sealed class HistoryService
     public Task<IReadOnlyList<HistoryItem>> GetMineAsync(int userId, int take = 100)
         => QueryAsync("WHERE e.UserId = @UserId", new { UserId = userId, Take = take }, "e.StartedAt DESC");
 
+    /// <summary>Lịch sử của một người dùng cụ thể (dùng cho thống kê: bấm vào người để xem báo cáo họ đã chạy).</summary>
+    public Task<IReadOnlyList<HistoryItem>> GetByUserAsync(int userId, int take = 200)
+        => QueryAsync("WHERE e.UserId = @UserId", new { UserId = userId, Take = take }, "e.StartedAt DESC");
+
     /// <summary>Lịch sử toàn hệ thống có lọc theo tên người chạy, trạng thái, khoảng ngày và sắp xếp.</summary>
     public Task<IReadOnlyList<HistoryItem>> GetAllAsync(
         string? q = null, string? status = null, string? sort = null,

@@ -25,6 +25,14 @@ public sealed class HistoryController : ControllerBase
         return Ok(await _history.GetAllAsync(q, status, sort, from, to));
     }
 
+    [HttpGet("user/{userId:int}")]
+    public async Task<IActionResult> ByUser(int userId)
+    {
+        if (!User.HasPermission("HISTORY.VIEW.ALL"))
+            return StatusCode(403, new { message = "Bạn không có quyền xem lịch sử của người dùng khác." });
+        return Ok(await _history.GetByUserAsync(userId));
+    }
+
     [HttpGet("stats/top-users")]
     public async Task<IActionResult> TopUsers()
     {

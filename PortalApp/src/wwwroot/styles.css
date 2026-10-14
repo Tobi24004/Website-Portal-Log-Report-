@@ -193,6 +193,8 @@ th.nosort { cursor: default; }
 th.nosort:hover { background: #F8FAFC; }
 tbody tr { transition: background .1s; }
 tbody tr:hover { background: #F1F6FF; }
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover { background: var(--info-bg); }
 tbody tr.sel { background: var(--info-bg); }
 td { color: var(--fg); }
 td.num { text-align: left; font-family: var(--mono); font-variant-numeric: tabular-nums; }

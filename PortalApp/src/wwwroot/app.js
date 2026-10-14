@@ -678,21 +678,66 @@ async function loadTopUsers() {
     const tb = el("tbody");
     rows.forEach((r, i) => {
       const rank = i < 3 ? ["🥇", "🥈", "🥉"][i] : String(i + 1);
-      tb.append(el("tr", {},
+      const tr = el("tr", { class: "clickable", title: "Bấm để xem báo cáo người này đã chạy",
+        onclick: () => openUserHistory(r) },
         el("td", { class: "num" }, rank),
         td((r.fullName ? r.fullName + " " : "") + "(" + r.username + ")"),
         td(r.department || "—"),
         tdNum(r.totalRuns.toLocaleString("vi-VN")),
         tdNum(r.successRuns.toLocaleString("vi-VN")),
         tdNum(r.failedRuns.toLocaleString("vi-VN")),
-        td(r.lastRun ? new Date(r.lastRun).toLocaleString("vi-VN") : "—")));
+        td(r.lastRun ? new Date(r.lastRun).toLocaleString("vi-VN") : "—"));
+      tb.append(tr);
     });
     if (rows.length === 0) tb.append(el("tr", {}, el("td", { colspan: 7, class: "muted" }, "Chưa có lượt chạy nào.")));
     table.append(tb);
     area.innerHTML = "";
-    area.append(el("p", { class: "page-sub" }, "Xếp hạng theo tổng số lần chạy báo cáo (nhiều nhất trước)."),
+    area.append(el("p", { class: "page-sub" }, "Xếp hạng theo tổng số lần chạy báo cáo (nhiều nhất trước). Bấm vào một người để xem các báo cáo họ đã chạy."),
       el("div", { class: "table-wrap" }, table));
   } catch (ex) { area.innerHTML = `<div class="alert err">${esc(ex.message)}</div>`; }
+}
+
+/* Modal: các báo cáo một người dùng đã chạy (mở từ bảng thống kê). */
+async function openUserHistory(r) {
+  const label = (r.fullName ? r.fullName + " " : "") + "(" + r.username + ")";
+  const bodyWrap = el("div", {}, el("p", { class: "muted" }, el("span", { class: "spinner" }), " Đang tải…"));
+  showModal("📄 Báo cáo đã chạy — " + label, bodyWrap, { wide: true });
+  let items;
+  try { items = await api(`/api/history/user/${r.userId}`); }
+  catch (ex) { bodyWrap.innerHTML = `<div class="alert err">${esc(ex.message)}</div>`; return; }
+
+  // Tóm tắt theo từng báo cáo (số lần chạy), nhiều nhất trước.
+  const byTpl = new Map();
+  for (const h of items) {
+    const k = h.templateName;
+    byTpl.set(k, (byTpl.get(k) || 0) + 1);
+  }
+  const summary = el("div", { class: "perm-children", style: "grid-template-columns:1fr 1fr" });
+  [...byTpl.entries()].sort((a, b) => b[1] - a[1]).forEach(([name, cnt]) =>
+    summary.append(el("div", { class: "perm-item" },
+      el("span", {}, name), el("span", { class: "badge mut", style: "margin-left:auto" }, cnt + " lần"))));
+
+  // Danh sách chi tiết các lần chạy.
+  const table = el("table");
+  table.append(el("thead", {}, rowH(["#", "Báo cáo", "Thời điểm", "Thời gian", "Số dòng", "Trạng thái"])));
+  const tb = el("tbody");
+  for (const h of items) {
+    tb.append(el("tr", {},
+      td(h.executionId), td(h.templateName),
+      td(new Date(h.startedAt).toLocaleString("vi-VN")),
+      tdNum(h.durationMs != null ? h.durationMs + " ms" : ""),
+      tdNum(h.rowCountOut != null ? h.rowCountOut.toLocaleString("vi-VN") : ""),
+      el("td", {}, statusBadge(h.status))));
+  }
+  if (items.length === 0) tb.append(el("tr", {}, el("td", { colspan: 6, class: "muted" }, "Người này chưa chạy báo cáo nào.")));
+  table.append(tb);
+
+  bodyWrap.innerHTML = "";
+  if (byTpl.size > 0) {
+    bodyWrap.append(el("h3", { style: "margin:0 0 8px" }, `Các báo cáo đã dùng (${byTpl.size})`), summary,
+      el("h3", { style: "margin:16px 0 8px" }, `Chi tiết lần chạy (${items.length})`));
+  }
+  bodyWrap.append(el("div", { class: "table-wrap" }, table));
 }
 
 async function rerunFromHistory(execId) {
