@@ -15,7 +15,7 @@
 - Chạy báo cáo: form tham số động, validate (bắt buộc/kiểu/min-max/độ dài, **từ ngày ≤ đến ngày**), parameter binding chống injection, timeout + giới hạn dòng.
 - Lưới kết quả: **phân trang + chọn số dòng/trang**, sắp xếp, tìm nhanh, **copy ô / dòng chọn / toàn bộ**, trạng thái rỗng/đang tải.
 - Xuất Excel `.xlsx`: sheet **Data** + sheet **Parameters** (báo cáo, người thực hiện, thời điểm, số dòng, thời gian chạy, tham số).
-- Lịch sử truy vấn (của tôi / toàn hệ thống) + chạy lại; lịch sử toàn hệ thống có **lọc theo người chạy, trạng thái (thành công/lỗi), sắp xếp theo thời điểm & thời lượng**, và **bảng xếp hạng người dùng chạy nhiều báo cáo nhất**; mã hóa mật khẩu kết nối bằng Data Protection.
+- Lịch sử truy vấn (của tôi / toàn hệ thống) + chạy lại; lịch sử toàn hệ thống có **lọc theo người chạy, trạng thái (thành công/lỗi), khoảng ngày (từ–đến), sắp xếp theo thời điểm & thời lượng**, và **bảng xếp hạng người dùng chạy nhiều báo cáo nhất**; mã hóa mật khẩu kết nối bằng Data Protection.
 
 ### Giao diện
 Thiết kế theo phong cách **Data-Dense Dashboard** (bảng màu Analytics, font *Plus Jakarta Sans* + *JetBrains Mono*),

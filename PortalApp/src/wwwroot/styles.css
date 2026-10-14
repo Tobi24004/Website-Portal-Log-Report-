@@ -274,7 +274,7 @@ td.cell-copy:hover { background: #e0e7ff; }
 .mail-preview { border: 1px solid var(--border); border-radius: 9px; margin-top: 12px; height: 340px; width: 100%; background: #fff; }
 
 /* toolbar search/select inputs (filters) */
-.toolbar input[type="search"], .toolbar input[type="text"] { padding: 8px 11px; border: 1px solid var(--border-strong); border-radius: 9px; font-size: 13px; background: #fff; }
+.toolbar input[type="search"], .toolbar input[type="text"], .toolbar input[type="date"] { padding: 8px 11px; border: 1px solid var(--border-strong); border-radius: 9px; font-size: 13px; background: #fff; }
 
 /* ---------------- Permission assignment modal ---------------- */
 .perm-wrap { display: flex; flex-direction: column; gap: 12px; }

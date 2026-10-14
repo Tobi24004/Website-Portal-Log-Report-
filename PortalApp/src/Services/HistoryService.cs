@@ -21,18 +21,21 @@ public sealed class HistoryService
     public Task<IReadOnlyList<HistoryItem>> GetMineAsync(int userId, int take = 100)
         => QueryAsync("WHERE e.UserId = @UserId", new { UserId = userId, Take = take }, "e.StartedAt DESC");
 
-    /// <summary>Lịch sử toàn hệ thống có lọc theo tên người chạy, trạng thái và sắp xếp.</summary>
+    /// <summary>Lịch sử toàn hệ thống có lọc theo tên người chạy, trạng thái, khoảng ngày và sắp xếp.</summary>
     public Task<IReadOnlyList<HistoryItem>> GetAllAsync(
-        string? q = null, string? status = null, string? sort = null, int take = 200)
+        string? q = null, string? status = null, string? sort = null,
+        DateTime? from = null, DateTime? to = null, int take = 200)
     {
         var clauses = new List<string>();
         if (!string.IsNullOrWhiteSpace(q))
             clauses.Add("(u.Username LIKE @Q OR u.FullName LIKE @Q)");
         if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
             clauses.Add("e.Status = @Status");
+        if (from.HasValue) clauses.Add("e.StartedAt >= @From");   // mốc UTC (client gửi theo múi giờ của họ)
+        if (to.HasValue) clauses.Add("e.StartedAt < @To");        // @To = đầu ngày kế tiếp -> bao trọn ngày cuối
         var where = clauses.Count > 0 ? "WHERE " + string.Join(" AND ", clauses) : "";
         var orderBy = SortMap.TryGetValue(sort ?? "started_desc", out var ob) ? ob : SortMap["started_desc"];
-        return QueryAsync(where, new { Take = take, Q = $"%{q}%", Status = status }, orderBy);
+        return QueryAsync(where, new { Take = take, Q = $"%{q}%", Status = status, From = from, To = to }, orderBy);
     }
 
     private async Task<IReadOnlyList<HistoryItem>> QueryAsync(string where, object args, string orderBy)

@@ -598,7 +598,7 @@ async function renderHistory() {
 }
 
 // bộ lọc cho tab "Toàn hệ thống" (giữ giữa các lần tải lại)
-const HistFilter = { q: "", status: "all", sort: "started_desc" };
+const HistFilter = { q: "", status: "all", sort: "started_desc", from: "", to: "" };
 
 async function loadHistory(which) {
   const area = $("#histArea");
@@ -614,11 +614,23 @@ async function loadHistory(which) {
     const fSort = el("select", {},
       ...[["started_desc", "Mới nhất trước"], ["started_asc", "Cũ nhất trước"], ["duration_desc", "Chạy lâu nhất"], ["duration_asc", "Chạy nhanh nhất"]]
         .map(([v, l]) => el("option", { value: v, ...(HistFilter.sort === v ? { selected: "" } : {}) }, l)));
+    const fFrom = el("input", { type: "date", value: HistFilter.from, title: "Từ ngày" });
+    const fTo = el("input", { type: "date", value: HistFilter.to, title: "Đến ngày" });
+    const fClear = el("button", { class: "btn ghost sm", title: "Xóa bộ lọc" }, "✕ Xóa lọc");
     let deb = null;
-    const apply = () => { HistFilter.q = fQ.value.trim(); HistFilter.status = fStatus.value; HistFilter.sort = fSort.value; loadHistory("all"); };
+    const apply = () => {
+      HistFilter.q = fQ.value.trim(); HistFilter.status = fStatus.value; HistFilter.sort = fSort.value;
+      HistFilter.from = fFrom.value; HistFilter.to = fTo.value;
+      if (HistFilter.from && HistFilter.to && HistFilter.from > HistFilter.to)
+        return toast('"Từ ngày" không được lớn hơn "Đến ngày".', "warn");
+      loadHistory("all");
+    };
     fQ.oninput = () => { clearTimeout(deb); deb = setTimeout(apply, 350); };
-    fStatus.onchange = apply; fSort.onchange = apply;
-    filterBar = el("div", { class: "toolbar" }, fQ, fStatus, fSort);
+    fStatus.onchange = apply; fSort.onchange = apply; fFrom.onchange = apply; fTo.onchange = apply;
+    fClear.onclick = () => { Object.assign(HistFilter, { q: "", status: "all", sort: "started_desc", from: "", to: "" }); loadHistory("all"); };
+    filterBar = el("div", { class: "toolbar" },
+      fQ, fStatus, fSort,
+      el("span", { class: "info" }, "Từ"), fFrom, el("span", { class: "info" }, "đến"), fTo, fClear);
   }
 
   const tableHolder = el("div", {}, el("p", { class: "muted" }, el("span", { class: "spinner" }), " Đang tải…"));
@@ -627,7 +639,14 @@ async function loadHistory(which) {
   area.append(tableHolder);
 
   try {
-    const qs = all ? `?q=${encodeURIComponent(HistFilter.q)}&status=${HistFilter.status}&sort=${HistFilter.sort}` : "";
+    let qs = "";
+    if (all) {
+      const p = new URLSearchParams({ q: HistFilter.q, status: HistFilter.status, sort: HistFilter.sort });
+      // ngày người dùng chọn là ngày theo múi giờ máy -> quy về mốc UTC cho server
+      if (HistFilter.from) p.set("from", new Date(HistFilter.from + "T00:00:00").toISOString());
+      if (HistFilter.to) { const d = new Date(HistFilter.to + "T00:00:00"); d.setDate(d.getDate() + 1); p.set("to", d.toISOString()); }
+      qs = "?" + p.toString();
+    }
     const items = await api("/api/history/" + which + qs);
     const table = el("table");
     table.append(el("thead", {}, rowH(["#", "Báo cáo", "Người chạy", "Thời điểm", "Thời gian", "Số dòng", "Trạng thái", ""])));
