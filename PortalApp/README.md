@@ -35,6 +35,7 @@ Thiết kế theo phong cách **Data-Dense Dashboard** (bảng màu Analytics, f
 | Giới hạn | Timeout & số dòng tối đa theo từng template; cảnh báo khi cắt bớt. |
 | Nhật ký | `QueryExecutions`, `QueryExecutionParameters`, `ExportHistories`, `AuditLogs` (không ghi mật khẩu). |
 | Phiên | Tự đăng xuất khi **không hoạt động 30 phút**. |
+| Chống brute-force | **Khóa tạm tài khoản** sau 5 lần sai (15 phút) + **rate-limit** endpoint đăng nhập theo IP. Ngưỡng chỉnh ở `Portal:Security` / biến môi trường. |
 
 Hai tài khoản SQL Server tách biệt theo nguyên tắc tối thiểu quyền:
 - `portal_app` — đọc/ghi **chỉ** trên `DBLogReportPortal` (metadata).

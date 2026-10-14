@@ -60,6 +60,8 @@ BEGIN
         PasswordHash  NVARCHAR(512)  NOT NULL,
         IsActive      BIT            NOT NULL CONSTRAINT DF_Users_IsActive  DEFAULT (1),
         MustChangePassword BIT       NOT NULL CONSTRAINT DF_Users_MustChangePwd DEFAULT (0), -- bắt buộc đổi MK lần đầu
+        FailedLoginCount INT          NOT NULL CONSTRAINT DF_Users_FailedLogin DEFAULT (0),   -- chống brute-force
+        LockoutUntil  DATETIME2(3)   NULL,                                                    -- khóa tạm đến thời điểm này
         LastLoginAt   DATETIME2(3)   NULL,
         -- audit
         IsDeleted     BIT            NOT NULL CONSTRAINT DF_Users_IsDeleted DEFAULT (0),

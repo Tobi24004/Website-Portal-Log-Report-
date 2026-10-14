@@ -1,7 +1,9 @@
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.RateLimiting;
 using Portal.Api.Infrastructure;
 using Portal.Api.Services;
 
@@ -56,6 +58,30 @@ builder.Services.AddAuthorization(options =>
         options.AddPolicy(perm, policy => policy.RequireClaim("perm", perm));
 });
 
+// ---- Rate limiting cho đăng nhập (chống brute-force dồn dập theo IP) ----
+var loginPermit = builder.Configuration.GetValue("Portal:Security:LoginRatePerMinute", 20);
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("login", httpCtx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpCtx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = loginPermit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    options.OnRejected = async (ctx, token) =>
+    {
+        ctx.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        ctx.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+        await ctx.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            message = "Quá nhiều yêu cầu đăng nhập. Vui lòng thử lại sau ít phút."
+        }, token);
+    };
+});
+
 var app = builder.Build();
 
 // ---- Security headers cho mọi response (kể cả tĩnh & lỗi) ----
@@ -96,6 +122,8 @@ app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
 // Phục vụ SPA tĩnh từ wwwroot.
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

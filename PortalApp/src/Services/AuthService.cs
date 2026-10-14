@@ -4,54 +4,88 @@ using Portal.Api.Models;
 
 namespace Portal.Api.Services;
 
+/// <summary>Kết quả đăng nhập, phân biệt sai thông tin vs. khóa tạm (chống brute-force).</summary>
+public enum LoginStatus { Success, InvalidCredentials, Locked }
+public sealed record LoginResult(LoginStatus Status, LoginResponse? Response = null, int LockoutRemainingSeconds = 0);
+
 public sealed class AuthService
 {
     private readonly IDbConnectionFactory _factory;
     private readonly TokenService _tokens;
     private readonly AuditService _audit;
+    private readonly int _maxFailed;
+    private readonly int _lockoutMinutes;
 
-    public AuthService(IDbConnectionFactory factory, TokenService tokens, AuditService audit)
+    public AuthService(IDbConnectionFactory factory, TokenService tokens, AuditService audit, IConfiguration config)
     {
         _factory = factory;
         _tokens = tokens;
         _audit = audit;
+        _maxFailed = Math.Max(3, config.GetValue("Portal:Security:MaxFailedAttempts", 5));
+        _lockoutMinutes = Math.Max(1, config.GetValue("Portal:Security:LockoutMinutes", 15));
     }
 
-    public async Task<LoginResponse?> LoginAsync(string username, string password, string? clientIp)
+    public async Task<LoginResult> LoginAsync(string username, string password, string? clientIp)
     {
         using var conn = _factory.CreateMeta();
 
         var row = await conn.QuerySingleOrDefaultAsync(
             """
-            SELECT UserId, Username, FullName, Email, Department, PasswordHash, IsActive
+            SELECT UserId, Username, PasswordHash, IsActive, FailedLoginCount, LockoutUntil
             FROM portal.Users
             WHERE Username = @Username AND IsDeleted = 0;
             """, new { Username = username });
 
-        if (row is null)
-            return null;
+        // Tài khoản không tồn tại / bị khóa vĩnh viễn -> trả "sai thông tin" (tránh dò username).
+        if (row is null || !(bool)row.IsActive)
+            return new LoginResult(LoginStatus.InvalidCredentials);
 
-        if (!(bool)row.IsActive)
-            return null;
+        int userId = row.UserId;
+        DateTime? lockoutUntil = row.LockoutUntil;
+        int failed = row.FailedLoginCount;
+        var now = DateTime.UtcNow;
+
+        // Đang trong thời gian khóa tạm -> từ chối ngay (kể cả mật khẩu đúng).
+        if (lockoutUntil.HasValue && lockoutUntil.Value > now)
+        {
+            await _audit.LogAsync(userId, "AUTH.LOGIN.LOCKED", "User", userId.ToString(), clientIp: clientIp);
+            return new LoginResult(LoginStatus.Locked, LockoutRemainingSeconds: (int)(lockoutUntil.Value - now).TotalSeconds);
+        }
 
         string storedHash = row.PasswordHash;
         if (!PasswordHasher.Verify(password, storedHash))
         {
-            await _audit.LogAsync((int)row.UserId, "AUTH.LOGIN.FAILED", "User", ((int)row.UserId).ToString(), clientIp: clientIp);
-            return null;
+            int newCount = failed + 1;
+            if (newCount >= _maxFailed)
+            {
+                // Vượt ngưỡng -> khóa tạm và reset bộ đếm.
+                var until = now.AddMinutes(_lockoutMinutes);
+                await conn.ExecuteAsync(
+                    "UPDATE portal.Users SET FailedLoginCount = 0, LockoutUntil = @Until WHERE UserId = @UserId;",
+                    new { Until = until, UserId = userId });
+                await _audit.LogAsync(userId, "AUTH.LOCKOUT", "User", userId.ToString(),
+                    newValue: $"locked {_lockoutMinutes}m", clientIp: clientIp);
+                return new LoginResult(LoginStatus.Locked, LockoutRemainingSeconds: _lockoutMinutes * 60);
+            }
+            await conn.ExecuteAsync(
+                "UPDATE portal.Users SET FailedLoginCount = @C WHERE UserId = @UserId;",
+                new { C = newCount, UserId = userId });
+            await _audit.LogAsync(userId, "AUTH.LOGIN.FAILED", "User", userId.ToString(),
+                newValue: $"attempt {newCount}/{_maxFailed}", clientIp: clientIp);
+            return new LoginResult(LoginStatus.InvalidCredentials);
         }
 
-        int userId = row.UserId;
+        // Đúng mật khẩu -> xóa bộ đếm & khóa, cập nhật lần đăng nhập cuối.
         await conn.ExecuteAsync(
-            "UPDATE portal.Users SET LastLoginAt = SYSUTCDATETIME() WHERE UserId = @UserId;",
+            "UPDATE portal.Users SET FailedLoginCount = 0, LockoutUntil = NULL, LastLoginAt = SYSUTCDATETIME() WHERE UserId = @UserId;",
             new { UserId = userId });
 
         var info = await LoadUserInfoAsync(conn, userId);
-        if (info is null) return null;
+        if (info is null) return new LoginResult(LoginStatus.InvalidCredentials);
 
         var (token, expires) = _tokens.Create(info);
         await _audit.LogAsync(userId, "AUTH.LOGIN", "User", userId.ToString(), clientIp: clientIp);
-        return new LoginResponse(token, expires, info);
+        return new LoginResult(LoginStatus.Success, new LoginResponse(token, expires, info));
     }
 
     public async Task<UserInfo?> GetMeAsync(int userId)

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Portal.Api.Infrastructure;
 using Portal.Api.Models;
 using Portal.Api.Services;
@@ -21,16 +22,22 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("login")]   // giới hạn số lần gọi theo IP (chống brute-force dồn dập)
     public async Task<IActionResult> Login([FromBody] LoginRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
             return BadRequest(new { message = "Vui lòng nhập tên đăng nhập và mật khẩu." });
 
         var result = await _auth.LoginAsync(req.Username.Trim(), req.Password, HttpContext.ClientIp());
-        if (result is null)
-            return Unauthorized(new { message = "Sai tên đăng nhập hoặc mật khẩu, hoặc tài khoản đã bị khóa." });
-
-        return Ok(result);
+        return result.Status switch
+        {
+            LoginStatus.Success => Ok(result.Response),
+            LoginStatus.Locked => StatusCode(StatusCodes.Status423Locked, new
+            {
+                message = $"Tài khoản tạm khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau {Math.Max(1, result.LockoutRemainingSeconds / 60)} phút."
+            }),
+            _ => Unauthorized(new { message = "Sai tên đăng nhập hoặc mật khẩu." })
+        };
     }
 
     [HttpGet("me")]
