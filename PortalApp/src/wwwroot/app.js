@@ -212,18 +212,10 @@ function renderSidebar() {
     sb.append(navItem("⚙️ Quản trị", "admin"));
 
   if (State.view === "report") {
-    const q = (State.catalogFilter || "").trim().toLowerCase();
-    const search = el("input", { class: "search", placeholder: "🔍 Tìm báo cáo…", value: State.catalogFilter || "" });
-    search.addEventListener("input", () => { State.catalogFilter = search.value; renderSidebar(); search.focus(); });
-    sb.append(el("div", { class: "side-search" }, search));
-
-    let shown = 0;
+    // Danh sách đầy đủ; việc tìm kiếm đã chuyển sang ô ở trang chính.
     for (const cat of State.catalog) {
-      const matches = cat.templates.filter(t => !q || t.templateName.toLowerCase().includes(q) || t.templateCode.toLowerCase().includes(q));
-      if (matches.length === 0) continue;
       sb.append(el("div", { class: "cat" }, cat.categoryName));
-      for (const t of matches) {
-        shown++;
+      for (const t of cat.templates) {
         sb.append(el("div", {
           class: "tpl" + (State.currentTemplate?.templateId === t.templateId ? " active" : ""),
           onclick: () => openTemplate(t.templateId)
@@ -232,8 +224,6 @@ function renderSidebar() {
     }
     if (State.catalog.length === 0)
       sb.append(el("div", { class: "tpl muted" }, "Chưa có báo cáo được cấp quyền."));
-    else if (shown === 0)
-      sb.append(el("div", { class: "tpl muted" }, "Không có báo cáo khớp từ khóa."));
   }
 }
 
