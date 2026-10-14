@@ -278,15 +278,10 @@ function renderReportHome() {
     panel.append(el("h3", {}, cat.categoryName + ` (${cat.templates.length})`));
     const grid = el("div", { class: "form-grid" });
     for (const t of cat.templates) {
-      const card = el("div", {
-        class: "field", style: "cursor:pointer;border:1px solid var(--border);border-radius:9px;padding:12px 14px;transition:box-shadow .15s,border-color .15s",
-        onclick: () => openTemplate(t.templateId),
-        onmouseover: function () { this.style.boxShadow = "var(--shadow-md)"; this.style.borderColor = "var(--secondary)"; },
-        onmouseout: function () { this.style.boxShadow = ""; this.style.borderColor = "var(--border)"; }
-      },
-        el("div", { style: "font-weight:700;color:var(--heading)" }, t.templateName),
-        el("div", { class: "muted", style: "font-size:12.5px;margin-top:3px" }, t.description || t.templateCode),
-        el("div", { style: "margin-top:8px;display:flex;gap:6px;flex-wrap:wrap" },
+      const card = el("div", { class: "report-card", onclick: () => openTemplate(t.templateId) },
+        el("div", { class: "rc-title" }, t.templateName),
+        el("div", { class: "rc-desc muted" }, t.description || t.templateCode),
+        el("div", { class: "rc-badges" },
           el("span", { class: "badge info" }, `${t.parameterCount} tham số`),
           t.allowExport ? el("span", { class: "badge ok" }, "Excel") : null,
           t.allowCopy ? el("span", { class: "badge mut" }, "Copy") : null));

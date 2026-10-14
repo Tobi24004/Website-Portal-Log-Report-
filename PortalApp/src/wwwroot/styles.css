@@ -306,3 +306,72 @@ td.cell-copy:hover { background: #e0e7ff; }
   #app { grid-template-columns: 1fr; grid-template-rows: var(--header) auto 1fr; }
   aside { grid-column: 1; grid-row: 2; max-height: 220px; }
 }
+
+/* ============================================================
+   UX polish — chuyển động tinh tế & micro-interactions
+   ============================================================ */
+
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+
+/* xuất hiện mượt cho các phần tử render 1 lần mỗi màn */
+.page-title, .page-sub, .kpi, .panel, .report-card, .empty {
+  animation: rise .34s cubic-bezier(.22,.61,.36,1) both;
+}
+/* KPI xuất hiện lần lượt (stagger) */
+.kpi-grid .kpi:nth-child(1) { animation-delay: .02s; }
+.kpi-grid .kpi:nth-child(2) { animation-delay: .07s; }
+.kpi-grid .kpi:nth-child(3) { animation-delay: .12s; }
+.kpi-grid .kpi:nth-child(4) { animation-delay: .17s; }
+
+/* KPI: nâng nhẹ khi hover + vòng tròn nền lớn dần */
+.kpi { transition: transform .18s ease, box-shadow .18s ease; }
+.kpi:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.kpi::after { transition: transform .3s ease, opacity .3s ease; }
+.kpi:hover::after { transform: scale(1.18); opacity: .7; }
+
+/* thẻ báo cáo: nâng lên + thanh nhấn bên trái mọc ra khi hover */
+.report-card {
+  position: relative; cursor: pointer; overflow: hidden; background: var(--card);
+  border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.report-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(var(--secondary), var(--primary));
+  transform: scaleY(0); transform-origin: top; transition: transform .18s ease;
+}
+.report-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--secondary); }
+.report-card:hover::before { transform: scaleY(1); }
+.report-card .rc-title { font-weight: 700; color: var(--heading); }
+.report-card .rc-desc { font-size: 12.5px; margin-top: 3px; }
+.report-card .rc-badges { margin-top: 9px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* nút: nhấn nảy nhẹ */
+.btn:not(:disabled):hover { transform: translateY(-1px); }
+.btn:not(:disabled):active { transform: translateY(0) scale(.97); }
+
+/* sidebar: trượt nhẹ khi hover + thanh nhấn khi active */
+aside .nav-item { position: relative; transition: background .12s, color .12s, transform .14s ease; }
+aside .nav-item:not(.active):hover { transform: translateX(3px); }
+aside .nav-item::before {
+  content: ""; position: absolute; left: 4px; top: 22%; bottom: 22%; width: 3px; border-radius: 3px;
+  background: #fff; transform: scaleY(0); transition: transform .18s ease;
+}
+aside .nav-item.active::before { transform: scaleY(1); }
+
+/* toast: trượt vào từ bên phải */
+#toast { animation: slideInRight .28s cubic-bezier(.22,.61,.36,1); }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } }
+
+/* màn đăng nhập: nền gradient trôi chậm + thẻ xuất hiện mượt */
+#login { background-size: 170% 170%, 170% 170%, 220% 220%; animation: drift 20s ease-in-out infinite alternate; }
+@keyframes drift { to { background-position: 18% 12%, 82% 88%, 100% 100%; } }
+.login-card { animation: rise .42s cubic-bezier(.22,.61,.36,1) both; }
+
+/* tôn trọng người dùng chọn giảm chuyển động (accessibility) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; scroll-behavior: auto !important;
+  }
+}
