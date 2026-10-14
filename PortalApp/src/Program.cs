@@ -7,6 +7,9 @@ using Portal.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Ẩn header "Server: Kestrel" (giảm lộ thông tin nền tảng).
+builder.WebHost.ConfigureKestrel(o => o.AddServerHeader = false);
+
 // ---- Data Protection (mã hóa mật khẩu kết nối); khóa lưu bền ở /app/keys ----
 var keysDir = new DirectoryInfo("/app/keys");
 if (!keysDir.Exists) keysDir.Create();
@@ -54,6 +57,26 @@ builder.Services.AddAuthorization(options =>
 });
 
 var app = builder.Build();
+
+// ---- Security headers cho mọi response (kể cả tĩnh & lỗi) ----
+app.Use(async (ctx, next) =>
+{
+    var h = ctx.Response.Headers;
+    h["X-Content-Type-Options"] = "nosniff";             // chặn MIME sniffing
+    h["X-Frame-Options"] = "DENY";                        // chống clickjacking
+    h["Referrer-Policy"] = "no-referrer";
+    h["X-XSS-Protection"] = "0";                          // theo khuyến nghị hiện đại (dựa vào CSP)
+    h["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()";
+    h["Content-Security-Policy"] =
+        "default-src 'self'; " +
+        "script-src 'self'; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "font-src 'self' https://fonts.gstatic.com; " +
+        "img-src 'self' data:; " +
+        "connect-src 'self'; " +
+        "frame-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    await next();
+});
 
 // ---- Xử lý lỗi tập trung: trả JSON thân thiện, ẩn stack trace ở Production ----
 app.UseExceptionHandler(errApp => errApp.Run(async ctx =>

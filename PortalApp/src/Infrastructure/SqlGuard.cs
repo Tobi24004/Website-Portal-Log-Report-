@@ -15,7 +15,9 @@ public static class SqlGuard
         "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "DROP", "ALTER", "CREATE",
         "GRANT", "REVOKE", "DENY", "EXEC", "EXECUTE", "SP_", "XP_", "SHUTDOWN",
         "BACKUP", "RESTORE", "RECONFIGURE", "OPENROWSET", "OPENQUERY", "OPENDATASOURCE",
-        "BULK", "WAITFOR", "DBCC", "KILL", "USE "
+        "BULK", "WAITFOR", "DBCC", "KILL", "USE ",
+        "INTO",             // chặn "SELECT ... INTO <bảng>" (tạo bảng = ghi dữ liệu)
+        "OPENXML", "GO"
     };
 
     public static (bool Ok, string? Reason) Validate(string? sql)
