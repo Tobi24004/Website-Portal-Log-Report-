@@ -18,3 +18,9 @@ PortalApp/mail/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Ảnh dán tạm
+Pasted image.png
+*.png
+*.jpg
+*.jpeg
