@@ -1117,11 +1117,52 @@ async function setActive(id, active) {
   try { await api(`/api/admin/users/${id}/active`, { method: "POST", body: { isActive: active } }); adminUsers($("#adminBody")); }
   catch (ex) { toast(ex.message, "err"); }
 }
+function randomPassword() {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ", lower = "abcdefghijkmnpqrstuvwxyz", dig = "23456789", sym = "!@#$%*";
+  const all = upper + lower + dig + sym, pick = s => s[Math.floor(Math.random() * s.length)];
+  const p = [pick(upper), pick(lower), pick(dig), pick(sym)];
+  for (let i = 0; i < 8; i++) p.push(pick(all));
+  return p.sort(() => Math.random() - 0.5).join("");
+}
+
 async function resetPwd(id, username) {
-  const pwd = prompt("Nhập mật khẩu mới cho " + username + " (tối thiểu 6 ký tự):");
-  if (!pwd) return;
-  try { await api(`/api/admin/users/${id}/reset-password`, { method: "POST", body: { newPassword: pwd } }); toast("Đã đổi mật khẩu."); }
-  catch (ex) { toast(ex.message, "err"); }
+  const pwd = el("input", { type: "password", autocomplete: "new-password", placeholder: "Tối thiểu 6 ký tự" });
+  const toggle = el("button", { class: "btn ghost sm", type: "button", title: "Hiện/ẩn mật khẩu" }, "👁");
+  toggle.onclick = () => { pwd.type = pwd.type === "password" ? "text" : "password"; };
+  const gen = el("button", { class: "btn ghost sm", type: "button" }, "🎲 Tạo ngẫu nhiên");
+  const copy = el("button", { class: "btn ghost sm", type: "button" }, "📋 Sao chép");
+  gen.onclick = () => { pwd.type = "text"; pwd.value = randomPassword(); err.classList.add("hidden"); };
+  copy.onclick = () => { if (pwd.value) clipboard(pwd.value, "Đã sao chép mật khẩu."); };
+
+  const err = el("div", { class: "alert err hidden" });
+  const save = el("button", { class: "btn primary" }, "💾 Đổi mật khẩu");
+  const body = el("div", {},
+    el("p", { class: "muted", style: "font-size:13px" },
+      "Đặt mật khẩu tạm cho ", el("b", {}, username), ". Người dùng sẽ ",
+      el("b", {}, "bắt buộc đổi lại"), " ở lần đăng nhập kế tiếp."),
+    el("div", { class: "field" }, el("label", {}, "Mật khẩu mới *"),
+      el("div", { class: "pwd-row" }, pwd, toggle)),
+    el("div", { class: "toolbar" }, gen, copy),
+    err,
+    el("div", { class: "toolbar" }, save));
+  const close = showModal("🔑 Đổi mật khẩu — " + username, body);
+  setTimeout(() => pwd.focus(), 50);
+
+  const submit = async () => {
+    err.classList.add("hidden");
+    if (!pwd.value || pwd.value.length < 6) return showErr(err, "Mật khẩu phải có ít nhất 6 ký tự.");
+    save.disabled = true; save.innerHTML = '<span class="spinner"></span> Đang đổi…';
+    try {
+      await api(`/api/admin/users/${id}/reset-password`, { method: "POST", body: { newPassword: pwd.value } });
+      close();
+      toast(`Đã đổi mật khẩu cho ${username}. Người dùng sẽ phải đổi lại khi đăng nhập.`);
+    } catch (ex) {
+      showErr(err, ex.message || "Đổi mật khẩu thất bại.");
+      save.disabled = false; save.innerHTML = "💾 Đổi mật khẩu";
+    }
+  };
+  save.addEventListener("click", submit);
+  pwd.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
 }
 
 async function adminConnections(body) {

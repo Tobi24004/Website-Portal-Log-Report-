@@ -289,6 +289,10 @@ td.cell-copy:hover { background: #e0e7ff; }
 .perm-item input:disabled + span { color: var(--muted-fg); }
 @media (max-width: 640px) { .perm-children { grid-template-columns: 1fr; } }
 
+/* password input + toggle row */
+.pwd-row { display: flex; gap: 8px; align-items: center; }
+.pwd-row input { flex: 1; }
+
 /* toast */
 #toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; box-shadow: var(--shadow-md); max-width: 380px; border: 1px solid transparent; animation: pop .2s ease; }
 
