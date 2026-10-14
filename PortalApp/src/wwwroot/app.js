@@ -653,14 +653,18 @@ async function renderHistory() {
   loadHistory("my");
 }
 
-// bộ lọc cho tab "Toàn hệ thống" (giữ giữa các lần tải lại)
-const HistFilter = { q: "", status: "all", sort: "started_desc", from: "", to: "" };
+// bộ lọc riêng cho từng tab lịch sử (giữ giữa các lần tải lại)
+const HistFilters = {
+  my:  { q: "", status: "all", sort: "started_desc", from: "", to: "" },
+  all: { q: "", status: "all", sort: "started_desc", from: "", to: "" }
+};
 
 let histReqSeq = 0; // chống race: chỉ nhận kết quả của lần gọi mới nhất
 
 async function loadHistory(which) {
   const area = $("#histArea");
   const all = which === "all";
+  const F = HistFilters[which];
   area.innerHTML = "";
 
   // Phần bảng được nạp lại độc lập — KHÔNG dựng lại thanh lọc (giữ focus ô đang gõ).
@@ -670,28 +674,24 @@ async function loadHistory(which) {
     const seq = ++histReqSeq;
     tableHolder.innerHTML = '<p class="muted"><span class="spinner"></span> Đang tải…</p>';
     try {
-      let qs = "";
-      if (all) {
-        const p = new URLSearchParams({ q: HistFilter.q, status: HistFilter.status, sort: HistFilter.sort });
-        // ngày người dùng chọn là ngày theo múi giờ máy -> quy về mốc UTC cho server
-        if (HistFilter.from) p.set("from", new Date(HistFilter.from + "T00:00:00").toISOString());
-        if (HistFilter.to) { const d = new Date(HistFilter.to + "T00:00:00"); d.setDate(d.getDate() + 1); p.set("to", d.toISOString()); }
-        qs = "?" + p.toString();
-      }
-      const items = await api("/api/history/" + which + qs);
+      const p = new URLSearchParams({ q: F.q, status: F.status, sort: F.sort });
+      // ngày người dùng chọn là ngày theo múi giờ máy -> quy về mốc UTC cho server
+      if (F.from) p.set("from", new Date(F.from + "T00:00:00").toISOString());
+      if (F.to) { const d = new Date(F.to + "T00:00:00"); d.setDate(d.getDate() + 1); p.set("to", d.toISOString()); }
+      const items = await api("/api/history/" + which + "?" + p.toString());
       if (seq !== histReqSeq) return; // đã có request mới hơn -> bỏ kết quả cũ
       const table = el("table");
-      table.append(el("thead", {}, rowH(["#", "Báo cáo", "Người chạy", "Thời điểm", "Thời gian", "Số dòng", "Trạng thái", ""])));
+      table.append(el("thead", {}, rowH(["STT", "Báo cáo", "Người chạy", "Thời điểm", "Thời gian", "Số dòng", "Trạng thái", ""])));
       const tb = el("tbody");
-      for (const h of items) {
+      items.forEach((h, i) => {
         const rerun = el("button", { class: "btn ghost sm", onclick: () => rerunFromHistory(h.executionId) }, "Chạy lại");
         tb.append(el("tr", {},
-          td(h.executionId), td(h.templateName), td(h.username),
+          tdNum(i + 1), td(h.templateName), td(h.username),
           td(new Date(h.startedAt).toLocaleString("vi-VN")),
           tdNum(h.durationMs != null ? h.durationMs + " ms" : ""),
           tdNum(h.rowCountOut != null ? h.rowCountOut.toLocaleString("vi-VN") : ""),
           el("td", {}, statusBadge(h.status)), el("td", {}, rerun)));
-      }
+      });
       if (items.length === 0) tb.append(el("tr", {}, el("td", { colspan: 8, class: "muted" }, "Không có lịch sử khớp bộ lọc.")));
       table.append(tb);
       tableHolder.innerHTML = ""; tableHolder.append(el("div", { class: "table-wrap" }, table));
@@ -701,37 +701,35 @@ async function loadHistory(which) {
     }
   }
 
-  // thanh lọc chỉ cho lịch sử toàn hệ thống — dựng MỘT LẦN
-  if (all) {
-    const fQ = el("input", { type: "search", placeholder: "🔍 Tìm theo người chạy…", value: HistFilter.q, style: "min-width:200px" });
-    const fStatus = el("select", {},
-      ...[["all", "Tất cả trạng thái"], ["Success", "Thành công"], ["Failed", "Lỗi"], ["Timeout", "Timeout"], ["Cancelled", "Đã hủy"]]
-        .map(([v, l]) => el("option", { value: v, ...(HistFilter.status === v ? { selected: "" } : {}) }, l)));
-    const fSort = el("select", {},
-      ...[["started_desc", "Mới nhất trước"], ["started_asc", "Cũ nhất trước"], ["duration_desc", "Chạy lâu nhất"], ["duration_asc", "Chạy nhanh nhất"]]
-        .map(([v, l]) => el("option", { value: v, ...(HistFilter.sort === v ? { selected: "" } : {}) }, l)));
-    const fFrom = el("input", { type: "date", value: HistFilter.from, title: "Từ ngày" });
-    const fTo = el("input", { type: "date", value: HistFilter.to, title: "Đến ngày" });
-    const fClear = el("button", { class: "btn ghost sm", type: "button", title: "Xóa bộ lọc" }, "✕ Xóa lọc");
-    let deb = null;
-    const apply = () => {
-      HistFilter.q = fQ.value.trim(); HistFilter.status = fStatus.value; HistFilter.sort = fSort.value;
-      HistFilter.from = fFrom.value; HistFilter.to = fTo.value;
-      if (HistFilter.from && HistFilter.to && HistFilter.from > HistFilter.to)
-        return toast('"Từ ngày" không được lớn hơn "Đến ngày".', "warn");
-      refresh();                       // chỉ nạp lại bảng, không đụng thanh lọc
-    };
-    fQ.oninput = () => { clearTimeout(deb); deb = setTimeout(apply, 350); };
-    fStatus.onchange = apply; fSort.onchange = apply; fFrom.onchange = apply; fTo.onchange = apply;
-    fClear.onclick = () => {
-      Object.assign(HistFilter, { q: "", status: "all", sort: "started_desc", from: "", to: "" });
-      fQ.value = ""; fStatus.value = "all"; fSort.value = "started_desc"; fFrom.value = ""; fTo.value = "";
-      refresh();
-    };
-    area.append(el("div", { class: "toolbar" },
-      fQ, fStatus, fSort,
-      el("span", { class: "info" }, "Từ"), fFrom, el("span", { class: "info" }, "đến"), fTo, fClear));
-  }
+  // thanh lọc cho CẢ hai tab — dựng MỘT LẦN
+  const fQ = el("input", { type: "search",
+    placeholder: all ? "🔍 Tìm theo người chạy…" : "🔍 Tìm theo tên báo cáo…",
+    value: F.q, style: "min-width:200px" });
+  const fStatus = el("select", {},
+    ...[["all", "Tất cả trạng thái"], ["Success", "Thành công"], ["Failed", "Lỗi"], ["Timeout", "Timeout"], ["Cancelled", "Đã hủy"]]
+      .map(([v, l]) => el("option", { value: v, ...(F.status === v ? { selected: "" } : {}) }, l)));
+  const fSort = el("select", {},
+    ...[["started_desc", "Mới nhất trước"], ["started_asc", "Cũ nhất trước"], ["duration_desc", "Chạy lâu nhất"], ["duration_asc", "Chạy nhanh nhất"]]
+      .map(([v, l]) => el("option", { value: v, ...(F.sort === v ? { selected: "" } : {}) }, l)));
+  const fFrom = el("input", { type: "date", value: F.from, title: "Từ ngày" });
+  const fTo = el("input", { type: "date", value: F.to, title: "Đến ngày" });
+  const fClear = el("button", { class: "btn ghost sm", type: "button", title: "Xóa bộ lọc" }, "✕ Xóa lọc");
+  let deb = null;
+  const apply = () => {
+    F.q = fQ.value.trim(); F.status = fStatus.value; F.sort = fSort.value; F.from = fFrom.value; F.to = fTo.value;
+    if (F.from && F.to && F.from > F.to) return toast('"Từ ngày" không được lớn hơn "Đến ngày".', "warn");
+    refresh();                       // chỉ nạp lại bảng, không đụng thanh lọc
+  };
+  fQ.oninput = () => { clearTimeout(deb); deb = setTimeout(apply, 350); };
+  fStatus.onchange = apply; fSort.onchange = apply; fFrom.onchange = apply; fTo.onchange = apply;
+  fClear.onclick = () => {
+    Object.assign(F, { q: "", status: "all", sort: "started_desc", from: "", to: "" });
+    fQ.value = ""; fStatus.value = "all"; fSort.value = "started_desc"; fFrom.value = ""; fTo.value = "";
+    refresh();
+  };
+  area.append(el("div", { class: "toolbar" },
+    fQ, fStatus, fSort,
+    el("span", { class: "info" }, "Từ"), fFrom, el("span", { class: "info" }, "đến"), fTo, fClear));
 
   area.append(tableHolder);
   refresh();
@@ -788,16 +786,16 @@ async function openUserHistory(r) {
 
   // Danh sách chi tiết các lần chạy.
   const table = el("table");
-  table.append(el("thead", {}, rowH(["#", "Báo cáo", "Thời điểm", "Thời gian", "Số dòng", "Trạng thái"])));
+  table.append(el("thead", {}, rowH(["STT", "Báo cáo", "Thời điểm", "Thời gian", "Số dòng", "Trạng thái"])));
   const tb = el("tbody");
-  for (const h of items) {
+  items.forEach((h, i) => {
     tb.append(el("tr", {},
-      td(h.executionId), td(h.templateName),
+      tdNum(i + 1), td(h.templateName),
       td(new Date(h.startedAt).toLocaleString("vi-VN")),
       tdNum(h.durationMs != null ? h.durationMs + " ms" : ""),
       tdNum(h.rowCountOut != null ? h.rowCountOut.toLocaleString("vi-VN") : ""),
       el("td", {}, statusBadge(h.status))));
-  }
+  });
   if (items.length === 0) tb.append(el("tr", {}, el("td", { colspan: 6, class: "muted" }, "Người này chưa chạy báo cáo nào.")));
   table.append(tb);
 

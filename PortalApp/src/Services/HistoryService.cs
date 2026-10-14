@@ -18,8 +18,22 @@ public sealed class HistoryService
         ["duration_asc"]  = "e.DurationMs ASC, e.StartedAt DESC",  // chạy nhanh nhất
     };
 
-    public Task<IReadOnlyList<HistoryItem>> GetMineAsync(int userId, int take = 100)
-        => QueryAsync("WHERE e.UserId = @UserId", new { UserId = userId, Take = take }, "e.StartedAt DESC");
+    /// <summary>Lịch sử của chính người dùng, có lọc theo tên báo cáo, trạng thái, khoảng ngày và sắp xếp.</summary>
+    public Task<IReadOnlyList<HistoryItem>> GetMineAsync(
+        int userId, string? q = null, string? status = null, string? sort = null,
+        DateTime? from = null, DateTime? to = null, int take = 200)
+    {
+        var clauses = new List<string> { "e.UserId = @UserId" };
+        if (!string.IsNullOrWhiteSpace(q))
+            clauses.Add("(t.TemplateName LIKE @Q OR t.TemplateCode LIKE @Q)");
+        if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
+            clauses.Add("e.Status = @Status");
+        if (from.HasValue) clauses.Add("e.StartedAt >= @From");
+        if (to.HasValue) clauses.Add("e.StartedAt < @To");
+        var where = "WHERE " + string.Join(" AND ", clauses);
+        var orderBy = SortMap.TryGetValue(sort ?? "started_desc", out var ob) ? ob : SortMap["started_desc"];
+        return QueryAsync(where, new { UserId = userId, Take = take, Q = $"%{q}%", Status = status, From = from, To = to }, orderBy);
+    }
 
     /// <summary>Lịch sử của một người dùng cụ thể (dùng cho thống kê: bấm vào người để xem báo cáo họ đã chạy).</summary>
     public Task<IReadOnlyList<HistoryItem>> GetByUserAsync(int userId, int take = 200)

@@ -14,7 +14,9 @@ public sealed class HistoryController : ControllerBase
     public HistoryController(HistoryService history) => _history = history;
 
     [HttpGet("my")]
-    public async Task<IActionResult> My() => Ok(await _history.GetMineAsync(User.GetUserId()));
+    public async Task<IActionResult> My([FromQuery] string? q, [FromQuery] string? status,
+        [FromQuery] string? sort, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+        => Ok(await _history.GetMineAsync(User.GetUserId(), q, status, sort, from, to));
 
     [HttpGet("all")]
     public async Task<IActionResult> All([FromQuery] string? q, [FromQuery] string? status,
