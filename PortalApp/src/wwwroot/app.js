@@ -160,6 +160,10 @@ function showErr(box, msg) { box.textContent = msg; box.classList.remove("hidden
 async function doLogout(expired) {
   try { if (!expired && State.token) await api("/api/auth/logout", { method: "POST" }); } catch {}
   State.token = null; State.user = null;
+  // Reset sạch phiên để không mang trạng thái/nội dung của người dùng trước sang người sau.
+  State.view = "report"; State.currentTemplate = null; State.result = null;
+  State.catalog = []; State.catalogFilter = "";
+  $("#content").innerHTML = ""; $("#sidebar").innerHTML = "";
   localStorage.removeItem("plr_token");
   clearTimeout(State.idleTimer);
   $("#app").classList.remove("show");
@@ -170,6 +174,7 @@ async function doLogout(expired) {
 }
 
 function has(perm) { return State.user?.permissions?.includes(perm); }
+function canAdmin() { return has("USER.MANAGE") || has("CONNECTION.MANAGE") || has("TEMPLATE.MANAGE") || has("AUDIT.VIEW"); }
 
 /* ---------------- App start ---------------- */
 async function startApp() {
@@ -182,7 +187,11 @@ async function startApp() {
     ["mousemove", "keydown", "click"].forEach(ev => document.addEventListener(ev, resetIdle));
     State.idleBound = true;
   }
-  if (State.user.mustChangePassword) { forceChangePassword(); return; }
+  if (State.user.mustChangePassword) {
+    $("#content").innerHTML = ""; $("#sidebar").innerHTML = "";   // tránh lộ nội dung phiên trước sau modal
+    forceChangePassword();
+    return;
+  }
   await continueApp();
 }
 
@@ -209,7 +218,7 @@ function renderSidebar() {
   sb.innerHTML = "";
   sb.append(navItem("📄 Báo cáo", "report"));
   sb.append(navItem("🕑 Lịch sử của tôi", "history"));
-  if (has("USER.MANAGE") || has("CONNECTION.MANAGE") || has("TEMPLATE.MANAGE") || has("AUDIT.VIEW"))
+  if (canAdmin())
     sb.append(navItem("⚙️ Quản trị", "admin"));
 
   if (State.view === "report") {
@@ -244,6 +253,9 @@ function record(mode) {
 }
 
 function navigate(view, { record: rec = "push" } = {}) {
+  // Chặn vào trang Quản trị khi không có quyền (vd: khôi phục từ Back của trình duyệt).
+  if (view === "admin" && !canAdmin()) view = "report";
+  if (view === "history" && !State.user) view = "report";
   // Bấm "Báo cáo" luôn về trang chính (bỏ báo cáo đang mở).
   if (view === "report") { State.currentTemplate = null; State.result = null; }
   State.view = view;
