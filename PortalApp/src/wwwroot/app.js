@@ -806,6 +806,10 @@ async function adminUsers(body) {
       ...depts.map(d => el("option", { value: d }, d)));
     const fRole = el("select", {}, el("option", { value: "" }, "Tất cả vai trò"),
       ...roles.map(r => el("option", { value: r }, r)));
+    const fStatus = el("select", {},
+      el("option", { value: "" }, "Tất cả trạng thái"),
+      el("option", { value: "active" }, "Hoạt động"),
+      el("option", { value: "locked" }, "Khóa"));
     const fSearch = el("input", { type: "search", placeholder: "🔍 Tìm tên đăng nhập / họ tên…", style: "min-width:220px" });
 
     const countInfo = el("span", { class: "info" });
@@ -813,7 +817,7 @@ async function adminUsers(body) {
       el("button", { class: "btn primary", onclick: () => openCreateUser(body) }, "➕ Thêm mới tài khoản"),
       el("button", { class: "btn ghost", onclick: () => openBulkImport(body) }, "⬆ Nhập hàng loạt"),
       el("button", { class: "btn ghost", onclick: openOutbox }, "📧 Hộp thư (demo)"),
-      fDept, fRole, fSearch, countInfo);
+      fDept, fRole, fStatus, fSearch, countInfo);
 
     const table = el("table");
     table.append(el("thead", {}, rowH(["Tên ĐN", "Họ tên", "Phòng ban", "Vai trò", "Trạng thái", "Đăng nhập cuối", "Thao tác"])));
@@ -821,11 +825,12 @@ async function adminUsers(body) {
     table.append(tb);
 
     const renderRows = () => {
-      const dq = fDept.value, rq = fRole.value, sq = fSearch.value.trim().toLowerCase();
+      const dq = fDept.value, rq = fRole.value, stq = fStatus.value, sq = fSearch.value.trim().toLowerCase();
       tb.innerHTML = "";
       const shown = users.filter(u =>
         (!dq || u.department === dq) &&
         (!rq || (u.roles || []).includes(rq)) &&
+        (!stq || (stq === "active" ? u.isActive : !u.isActive)) &&
         (!sq || (u.username + " " + (u.fullName || "")).toLowerCase().includes(sq)));
       for (const u of shown) {
         const toggle = el("button", { class: "btn ghost sm", onclick: () => setActive(u.userId, !u.isActive) }, u.isActive ? "Khóa" : "Mở khóa");
@@ -841,7 +846,7 @@ async function adminUsers(body) {
       if (shown.length === 0) tb.append(el("tr", {}, el("td", { colspan: 7, class: "muted" }, "Không có tài khoản khớp bộ lọc.")));
       countInfo.textContent = `${shown.length}/${users.length} tài khoản`;
     };
-    fDept.onchange = renderRows; fRole.onchange = renderRows; fSearch.oninput = renderRows;
+    fDept.onchange = renderRows; fRole.onchange = renderRows; fStatus.onchange = renderRows; fSearch.oninput = renderRows;
 
     body.innerHTML = "";
     body.append(bar, el("div", { class: "table-wrap" }, table));
