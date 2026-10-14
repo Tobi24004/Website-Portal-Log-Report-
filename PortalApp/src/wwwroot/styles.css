@@ -393,3 +393,10 @@ aside::-webkit-scrollbar-thumb:hover, main::-webkit-scrollbar-thumb:hover,
 .table-wrap::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 aside::-webkit-scrollbar-track, main::-webkit-scrollbar-track,
 .table-wrap::-webkit-scrollbar-track { background: transparent; }
+
+/* ghi chú "quên mật khẩu" ở màn đăng nhập */
+.login-note {
+  margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--border);
+  text-align: center; font-size: 12.5px; color: var(--muted-fg);
+}
+.login-note b { color: var(--heading); }
