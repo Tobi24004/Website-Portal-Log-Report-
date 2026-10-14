@@ -235,11 +235,21 @@ function navItem(label, view) {
 }
 
 function navigate(view) {
+  // Bấm "Báo cáo" luôn về trang chính (bỏ báo cáo đang mở).
+  if (view === "report") { State.currentTemplate = null; State.result = null; }
   State.view = view;
   renderSidebar();
   if (view === "report") renderReportHome();
   else if (view === "history") renderHistory();
   else if (view === "admin") renderAdmin();
+}
+
+/* Về trang chính danh mục báo cáo (dùng cho nút quay lại). */
+function goReportHome() {
+  State.currentTemplate = null; State.result = null; State.view = "report";
+  renderSidebar();
+  renderReportHome();
+  window.scrollTo(0, 0);
 }
 
 /* ---------------- Report ---------------- */
@@ -343,6 +353,7 @@ async function openTemplate(id) {
 function renderTemplate(t, prefill = null) {
   const c = $("#content");
   c.innerHTML = "";
+  c.append(el("button", { class: "btn ghost sm back-link", onclick: goReportHome }, "← Danh sách báo cáo"));
   c.append(el("h2", { class: "page-title" }, t.templateName));
   c.append(el("p", { class: "page-sub" }, t.description || t.templateCode));
 

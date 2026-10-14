@@ -410,3 +410,6 @@ aside::-webkit-scrollbar-track, main::-webkit-scrollbar-track,
 }
 .home-search input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
 .home-search .info { color: var(--muted-fg); font-size: 13px; }
+
+/* nút quay lại ở màn báo cáo */
+.back-link { margin-bottom: 10px; }
