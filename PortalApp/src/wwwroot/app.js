@@ -273,6 +273,15 @@ function renderReportHome() {
     c.append(emptyState("🔒", "Bạn chưa được cấp quyền báo cáo nào", "Liên hệ quản trị viên để được phân quyền."));
     return;
   }
+
+  // ---- ô tìm báo cáo (lọc tức thời theo tên / mô tả / mã) ----
+  const search = el("input", { type: "search", id: "homeSearch",
+    placeholder: "🔍 Tìm báo cáo theo tên…", value: State.catalogFilter || "" });
+  const resultInfo = el("span", { class: "info" });
+  c.append(el("div", { class: "home-search" }, search, resultInfo));
+
+  const entries = [];   // {card, panel, text}
+  const panels = [];
   for (const cat of State.catalog) {
     const panel = el("div", { class: "panel" });
     panel.append(el("h3", {}, cat.categoryName + ` (${cat.templates.length})`));
@@ -286,10 +295,32 @@ function renderReportHome() {
           t.allowExport ? el("span", { class: "badge ok" }, "Excel") : null,
           t.allowCopy ? el("span", { class: "badge mut" }, "Copy") : null));
       grid.append(card);
+      entries.push({ card, panel, text: (t.templateName + " " + (t.description || "") + " " + t.templateCode).toLowerCase() });
     }
     panel.append(grid);
+    panels.push(panel);
     c.append(panel);
   }
+  const noMatch = emptyState("🔍", "Không tìm thấy báo cáo khớp", "Thử từ khóa khác.");
+  noMatch.style.display = "none";
+  c.append(noMatch);
+
+  const applyFilter = () => {
+    const q = (search.value || "").trim().toLowerCase();
+    State.catalogFilter = search.value;   // đồng bộ với ô tìm ở sidebar
+    const visiblePanels = new Set();
+    let shown = 0;
+    for (const e of entries) {
+      const m = !q || e.text.includes(q);
+      e.card.style.display = m ? "" : "none";
+      if (m) { shown++; visiblePanels.add(e.panel); }
+    }
+    for (const p of panels) p.style.display = visiblePanels.has(p) ? "" : "none";
+    noMatch.style.display = shown ? "none" : "";
+    resultInfo.textContent = q ? `${shown}/${total} báo cáo` : "";
+  };
+  search.addEventListener("input", applyFilter);
+  if (State.catalogFilter) applyFilter();
 }
 
 function kpiCard(icon, label, value) {

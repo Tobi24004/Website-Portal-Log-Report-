@@ -400,3 +400,13 @@ aside::-webkit-scrollbar-track, main::-webkit-scrollbar-track,
   text-align: center; font-size: 12.5px; color: var(--muted-fg);
 }
 .login-note b { color: var(--heading); }
+
+/* ô tìm báo cáo trên trang chính */
+.home-search { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; }
+.home-search input {
+  flex: 1; max-width: 460px; padding: 10px 14px; font-size: 14px;
+  border: 1px solid var(--border-strong); border-radius: 10px; background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+}
+.home-search input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+.home-search .info { color: var(--muted-fg); font-size: 13px; }
