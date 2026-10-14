@@ -1,0 +1,20 @@
+# ---- Secrets (KHÔNG commit) ----
+PortalApp/.env
+*.env
+!*.env.example
+
+# ---- .NET build output ----
+bin/
+obj/
+*.user
+
+# ---- Email pickup / runtime data ----
+PortalApp/mail/
+*.eml
+
+# ---- OS / editor ----
+.vs/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp

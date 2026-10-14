@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal Log Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
+</head>
+<body>
+  <!-- ================= LOGIN ================= -->
+  <div id="login">
+    <form class="login-card" id="loginForm">
+      <div class="brand"><span class="dot">📊</span><h1>Portal Log Report</h1></div>
+      <p class="sub">Hệ thống tra cứu & xuất báo cáo theo mẫu SQL</p>
+      <label for="username">Tên đăng nhập</label>
+      <input id="username" autocomplete="username" required autofocus />
+      <label for="password">Mật khẩu</label>
+      <input id="password" type="password" autocomplete="current-password" required />
+      <div id="loginError" class="alert err hidden"></div>
+      <button type="submit" id="loginBtn">Đăng nhập</button>
+      <div class="login-hint">
+        Tài khoản demo: <code class="inline">admin / Admin@123</code> ·
+        <code class="inline">sales01 / Portal@123</code> ·
+        <code class="inline">warehouse01</code> · <code class="inline">manager01</code> …
+      </div>
+    </form>
+  </div>
+
+  <!-- ================= APP ================= -->
+  <div id="app">
+    <header>
+      <span class="logo"><span class="dot">📊</span> Portal Log Report</span>
+      <span class="spacer"></span>
+      <span class="user">Xin chào, <b id="hdrName"></b> <span id="hdrDept" class="muted"></span></span>
+      <button class="link" id="changePwdBtn">Đổi mật khẩu</button>
+      <button class="link" id="logoutBtn">Đăng xuất</button>
+    </header>
+
+    <aside id="sidebar"></aside>
+
+    <main id="content"></main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

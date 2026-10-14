@@ -1,0 +1,47 @@
+services:
+  portal:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    image: portal-log-report:latest
+    container_name: portal-log-report
+    ports:
+      - "8080:8080"
+    environment:
+      # Metadata DB (DBLogReportPortal) — read/write for the portal itself.
+      Portal__MetaConnectionString: "Server=host.docker.internal,1433;Database=DBLogReportPortal;User Id=portal_app;Password=${PORTAL_APP_PASSWORD};TrustServerCertificate=True;Encrypt=True"
+      # When a DatabaseConnections row uses ServerHost 'localhost', rewrite it to
+      # reach the host SQL Server from inside the container.
+      Portal__SourceHostOverride: "host.docker.internal"
+      Portal__Jwt__SigningKey: "${JWT_SIGNING_KEY}"
+      Portal__Jwt__ExpireMinutes: "60"
+      Portal__Seed__Enabled: "true"
+      Portal__Seed__DefaultPassword: "${SEED_DEFAULT_PASSWORD}"
+      Portal__Seed__AdminPassword: "${SEED_ADMIN_PASSWORD}"
+      # Password of the read-only source login (portal_readonly) to encrypt & store.
+      Portal__Seed__SourcePassword: "${SOURCE_READONLY_PASSWORD}"
+      # Email chào mừng khi tạo tài khoản. Mode: Pickup (demo, ghi .eml) | Smtp | Disabled.
+      Portal__Email__Mode: "${EMAIL_MODE:-Pickup}"
+      Portal__Email__From: "${EMAIL_FROM:-no-reply@portal.local}"
+      Portal__Email__FromName: "Portal Log Report"
+      Portal__Email__PickupDirectory: "/app/mail"
+      Portal__Email__LoginUrl: "${PORTAL_PUBLIC_URL:-http://localhost:8080}"
+      Portal__Email__Smtp__Host: "${SMTP_HOST:-}"
+      Portal__Email__Smtp__Port: "${SMTP_PORT:-587}"
+      Portal__Email__Smtp__User: "${SMTP_USER:-}"
+      Portal__Email__Smtp__Password: "${SMTP_PASSWORD:-}"
+      Portal__Email__Smtp__UseSsl: "${SMTP_USE_SSL:-true}"
+      ASPNETCORE_ENVIRONMENT: "Production"
+    extra_hosts:
+      # Lets the container reach SQL Server running natively on the host.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Persist Data Protection keys so encrypted secrets survive restarts.
+      - portal_keys:/app/keys
+      # Hộp thư demo (chế độ Pickup ghi file .eml vào đây).
+      - portal_mail:/app/mail
+    restart: unless-stopped
+
+volumes:
+  portal_keys:
+  portal_mail:
