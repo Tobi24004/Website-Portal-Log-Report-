@@ -51,6 +51,30 @@ Hai tài khoản SQL Server tách biệt theo nguyên tắc tối thiểu quyề
 - Hai login đã tạo: `portal_app` (`PortalApp/sql/CreateAppLogin.sql`) và
   `portal_readonly` (`../CreateReadonlyLogin.sql`).
 
+### Lấy database nguồn `WideWorldImporters`
+
+Tải file backup mẫu chính thức của Microsoft:
+
+- **[WideWorldImporters-Full.bak](https://github.com/Microsoft/sql-server-samples/releases/download/wide-world-importers-v1.0/WideWorldImporters-Full.bak)**
+  (~127 MB, từ repo `microsoft/sql-server-samples`).
+
+Phục hồi vào SQL Server (chạy bằng tài khoản `sa` trong SSMS / `sqlcmd`):
+
+```sql
+RESTORE DATABASE WideWorldImporters
+FROM DISK = N'C:\backup\WideWorldImporters-Full.bak'
+WITH MOVE 'WWI_Primary'           TO N'C:\Data\WideWorldImporters.mdf',
+     MOVE 'WWI_UserData'          TO N'C:\Data\WideWorldImporters_UserData.ndf',
+     MOVE 'WWI_Log'               TO N'C:\Data\WideWorldImporters.ldf',
+     MOVE 'WWI_InMemory_Data_1'   TO N'C:\Data\WideWorldImporters_InMemory_Data_1',
+     RECOVERY, REPLACE;
+```
+
+> Đổi các đường dẫn `C:\backup` / `C:\Data` cho khớp máy bạn (trên Linux/Docker
+> thường là `/var/opt/mssql/backup` và `/var/opt/mssql/data`). Cần 4 mệnh đề
+> `MOVE` vì database này có cả filegroup In-Memory. Sau khi restore, chạy
+> `CreateReadonlyLogin.sql` để cấp tài khoản chỉ đọc cho ứng dụng.
+
 ---
 
 ## 3. Chạy ứng dụng
