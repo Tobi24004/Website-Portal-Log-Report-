@@ -17,11 +17,19 @@ public sealed class HistoryController : ControllerBase
     public async Task<IActionResult> My() => Ok(await _history.GetMineAsync(User.GetUserId()));
 
     [HttpGet("all")]
-    public async Task<IActionResult> All()
+    public async Task<IActionResult> All([FromQuery] string? q, [FromQuery] string? status, [FromQuery] string? sort)
     {
         if (!User.HasPermission("HISTORY.VIEW.ALL"))
             return StatusCode(403, new { message = "Bạn không có quyền xem lịch sử toàn hệ thống." });
-        return Ok(await _history.GetAllAsync());
+        return Ok(await _history.GetAllAsync(q, status, sort));
+    }
+
+    [HttpGet("stats/top-users")]
+    public async Task<IActionResult> TopUsers()
+    {
+        if (!User.HasPermission("HISTORY.VIEW.ALL"))
+            return StatusCode(403, new { message = "Bạn không có quyền xem thống kê toàn hệ thống." });
+        return Ok(await _history.GetTopUsersAsync());
     }
 
     [HttpGet("{executionId:long}/rerun")]

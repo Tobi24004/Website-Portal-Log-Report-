@@ -80,6 +80,21 @@ public sealed class AdminController : ControllerBase
         return Ok(new { message = req.IsActive ? "Đã mở khóa tài khoản." : "Đã khóa tài khoản." });
     }
 
+    [HttpGet("users/{id:int}/permissions")]
+    [Authorize(Policy = "USER.MANAGE")]
+    public async Task<IActionResult> GetUserPermissions(int id)
+        => Ok(await _admin.GetUserPermissionsAsync(id));
+
+    [HttpPut("users/{id:int}/permissions")]
+    [Authorize(Policy = "USER.MANAGE")]
+    public async Task<IActionResult> SetUserPermissions(int id, [FromBody] SetUserPermissionsRequest req)
+    {
+        await _admin.SetUserPermissionsAsync(id, req.TemplateIds ?? Array.Empty<int>(), User.GetUserId());
+        await _audit.LogAsync(User.GetUserId(), "USER.SET_PERMISSIONS", "User", id.ToString(),
+            newValue: $"{(req.TemplateIds?.Length ?? 0)} báo cáo", clientIp: HttpContext.ClientIp());
+        return Ok(new { message = "Đã cập nhật quyền truy cập báo cáo." });
+    }
+
     // ---- Connections ----
     [HttpGet("connections")]
     [Authorize(Policy = "CONNECTION.MANAGE")]

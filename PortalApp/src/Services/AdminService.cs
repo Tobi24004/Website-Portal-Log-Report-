@@ -86,6 +86,55 @@ public sealed class AdminService
             new { IsActive = isActive, By = actingUserId, UserId = userId });
     }
 
+    // ---- Phân quyền báo cáo theo từng người dùng ----
+    /// <summary>Danh sách mọi báo cáo (còn hiệu lực) kèm cờ: user được cấp trực tiếp / được cấp qua vai trò.</summary>
+    public async Task<IReadOnlyList<UserPermissionItem>> GetUserPermissionsAsync(int userId)
+    {
+        using var conn = _factory.CreateMeta();
+        var rows = await conn.QueryAsync<UserPermissionItem>(
+            """
+            SELECT t.TemplateId, t.TemplateCode, t.TemplateName,
+                   c.CategoryId, c.CategoryName,
+                   CAST(CASE WHEN EXISTS (
+                        SELECT 1 FROM portal.ReportTemplatePermissions g
+                        WHERE g.TemplateId = t.TemplateId AND g.UserId = @UserId) THEN 1 ELSE 0 END AS BIT) AS GrantedDirect,
+                   CAST(CASE WHEN EXISTS (
+                        SELECT 1 FROM portal.ReportTemplatePermissions g
+                        JOIN portal.UserRoles ur ON ur.RoleId = g.RoleId AND ur.UserId = @UserId
+                        WHERE g.TemplateId = t.TemplateId AND g.RoleId IS NOT NULL) THEN 1 ELSE 0 END AS BIT) AS GrantedViaRole
+            FROM portal.ReportTemplates t
+            JOIN portal.ReportCategories c ON c.CategoryId = t.CategoryId AND c.IsDeleted = 0
+            WHERE t.IsDeleted = 0 AND t.Status = N'Published'
+            ORDER BY c.DisplayOrder, c.CategoryName, t.TemplateName;
+            """, new { UserId = userId });
+        return rows.ToList();
+    }
+
+    /// <summary>Đặt lại toàn bộ quyền cấp-trực-tiếp cho user (thay thế danh sách cũ). Không đụng quyền theo vai trò.</summary>
+    public async Task SetUserPermissionsAsync(int userId, int[] templateIds, int actingUserId)
+    {
+        using var conn = _factory.CreateMeta();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        await conn.ExecuteAsync(
+            "DELETE FROM portal.ReportTemplatePermissions WHERE UserId = @UserId;",
+            new { UserId = userId }, tx);
+
+        if (templateIds is { Length: > 0 })
+        {
+            // Chỉ cấp cho báo cáo còn hiệu lực (chống id rác).
+            await conn.ExecuteAsync(
+                """
+                INSERT INTO portal.ReportTemplatePermissions (TemplateId, UserId, GrantedBy)
+                SELECT t.TemplateId, @UserId, @By
+                FROM portal.ReportTemplates t
+                WHERE t.TemplateId IN @Ids AND t.IsDeleted = 0;
+                """, new { UserId = userId, By = actingUserId, Ids = templateIds }, tx);
+        }
+        tx.Commit();
+    }
+
     // ---- Connections ----
     public async Task<IReadOnlyList<AdminConnection>> GetConnectionsAsync()
     {

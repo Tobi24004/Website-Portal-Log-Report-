@@ -83,3 +83,15 @@ public sealed record TemplateFull(
 
 public sealed record SqlValidateRequest(string Sql);
 public sealed record SqlValidateResult(bool Ok, string? Reason);
+
+// ---- Admin: phân quyền báo cáo theo từng người dùng ----
+public sealed record UserPermissionItem(
+    int TemplateId, string TemplateCode, string TemplateName,
+    int CategoryId, string CategoryName,
+    bool GrantedDirect, bool GrantedViaRole);
+public sealed record SetUserPermissionsRequest(int[]? TemplateIds);
+
+// ---- Lịch sử: thống kê người dùng chạy nhiều báo cáo nhất ----
+public sealed record TopUserStat(
+    int UserId, string Username, string? FullName, string? Department,
+    int TotalRuns, int SuccessRuns, int FailedRuns, DateTime? LastRun);

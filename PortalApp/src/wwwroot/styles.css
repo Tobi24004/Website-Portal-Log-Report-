@@ -273,6 +273,20 @@ td.cell-copy:hover { background: #e0e7ff; }
 .mail-list .item.active { background: var(--info-bg); }
 .mail-preview { border: 1px solid var(--border); border-radius: 9px; margin-top: 12px; height: 340px; width: 100%; background: #fff; }
 
+/* toolbar search/select inputs (filters) */
+.toolbar input[type="search"], .toolbar input[type="text"] { padding: 8px 11px; border: 1px solid var(--border-strong); border-radius: 9px; font-size: 13px; background: #fff; }
+
+/* ---------------- Permission assignment modal ---------------- */
+.perm-wrap { display: flex; flex-direction: column; gap: 12px; }
+.perm-group { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.perm-group-head { display: flex; align-items: center; gap: 9px; padding: 10px 14px; background: var(--muted); font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.perm-group-head input { width: auto; }
+.perm-children { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; padding: 12px 16px; }
+.perm-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+.perm-item input { width: auto; }
+.perm-item input:disabled + span { color: var(--muted-fg); }
+@media (max-width: 640px) { .perm-children { grid-template-columns: 1fr; } }
+
 /* toast */
 #toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; box-shadow: var(--shadow-md); max-width: 380px; border: 1px solid transparent; animation: pop .2s ease; }
 

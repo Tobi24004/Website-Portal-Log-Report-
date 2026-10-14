@@ -585,41 +585,95 @@ async function renderHistory() {
   const showAll = has("HISTORY.VIEW.ALL");
   if (showAll) {
     const tabs = el("div", { class: "tabs" });
-    const tMy = el("div", { class: "tab active" }, "Của tôi");
-    const tAll = el("div", { class: "tab" }, "Toàn hệ thống");
-    tMy.onclick = () => { tMy.classList.add("active"); tAll.classList.remove("active"); loadHistory("my"); };
-    tAll.onclick = () => { tAll.classList.add("active"); tMy.classList.remove("active"); loadHistory("all"); };
-    tabs.append(tMy, tAll);
+    const defs = [["Của tôi", () => loadHistory("my")], ["Toàn hệ thống", () => loadHistory("all")], ["📊 Thống kê sử dụng", loadTopUsers]];
+    defs.forEach(([name, fn], i) => {
+      const t = el("div", { class: "tab" + (i === 0 ? " active" : "") }, name);
+      t.onclick = () => { tabs.querySelectorAll(".tab").forEach(x => x.classList.remove("active")); t.classList.add("active"); fn(); };
+      tabs.append(t);
+    });
     c.append(tabs);
   }
   c.append(el("div", { id: "histArea" }));
   loadHistory("my");
 }
 
+// bộ lọc cho tab "Toàn hệ thống" (giữ giữa các lần tải lại)
+const HistFilter = { q: "", status: "all", sort: "started_desc" };
+
 async function loadHistory(which) {
   const area = $("#histArea");
-  area.innerHTML = '<p class="muted"><span class="spinner"></span> Đang tải…</p>';
+  const all = which === "all";
+
+  // thanh lọc chỉ cho lịch sử toàn hệ thống
+  let filterBar = null;
+  if (all) {
+    const fQ = el("input", { type: "search", placeholder: "🔍 Tìm theo người chạy…", value: HistFilter.q, style: "min-width:200px" });
+    const fStatus = el("select", {},
+      ...[["all", "Tất cả trạng thái"], ["Success", "Thành công"], ["Failed", "Lỗi"], ["Timeout", "Timeout"], ["Cancelled", "Đã hủy"]]
+        .map(([v, l]) => el("option", { value: v, ...(HistFilter.status === v ? { selected: "" } : {}) }, l)));
+    const fSort = el("select", {},
+      ...[["started_desc", "Mới nhất trước"], ["started_asc", "Cũ nhất trước"], ["duration_desc", "Chạy lâu nhất"], ["duration_asc", "Chạy nhanh nhất"]]
+        .map(([v, l]) => el("option", { value: v, ...(HistFilter.sort === v ? { selected: "" } : {}) }, l)));
+    let deb = null;
+    const apply = () => { HistFilter.q = fQ.value.trim(); HistFilter.status = fStatus.value; HistFilter.sort = fSort.value; loadHistory("all"); };
+    fQ.oninput = () => { clearTimeout(deb); deb = setTimeout(apply, 350); };
+    fStatus.onchange = apply; fSort.onchange = apply;
+    filterBar = el("div", { class: "toolbar" }, fQ, fStatus, fSort);
+  }
+
+  const tableHolder = el("div", {}, el("p", { class: "muted" }, el("span", { class: "spinner" }), " Đang tải…"));
+  area.innerHTML = "";
+  if (filterBar) area.append(filterBar);
+  area.append(tableHolder);
+
   try {
-    const items = await api("/api/history/" + which);
+    const qs = all ? `?q=${encodeURIComponent(HistFilter.q)}&status=${HistFilter.status}&sort=${HistFilter.sort}` : "";
+    const items = await api("/api/history/" + which + qs);
     const table = el("table");
     table.append(el("thead", {}, rowH(["#", "Báo cáo", "Người chạy", "Thời điểm", "Thời gian", "Số dòng", "Trạng thái", ""])));
     const tb = el("tbody");
     for (const h of items) {
-      const badge = statusBadge(h.status);
       const rerun = el("button", { class: "btn ghost sm", onclick: () => rerunFromHistory(h.executionId) }, "Chạy lại");
       tb.append(el("tr", {},
         td(h.executionId), td(h.templateName), td(h.username),
         td(new Date(h.startedAt).toLocaleString("vi-VN")),
         tdNum(h.durationMs != null ? h.durationMs + " ms" : ""),
         tdNum(h.rowCountOut != null ? h.rowCountOut.toLocaleString("vi-VN") : ""),
-        el("td", {}, badge), el("td", {}, rerun)));
+        el("td", {}, statusBadge(h.status)), el("td", {}, rerun)));
     }
-    if (items.length === 0) tb.append(el("tr", {}, el("td", { colspan: 8, class: "muted" }, "Chưa có lịch sử.")));
+    if (items.length === 0) tb.append(el("tr", {}, el("td", { colspan: 8, class: "muted" }, "Không có lịch sử khớp bộ lọc.")));
     table.append(tb);
-    area.innerHTML = ""; area.append(el("div", { class: "table-wrap" }, table));
+    tableHolder.innerHTML = ""; tableHolder.append(el("div", { class: "table-wrap" }, table));
   } catch (ex) {
-    area.innerHTML = `<div class="alert err">${esc(ex.message)}</div>`;
+    tableHolder.innerHTML = `<div class="alert err">${esc(ex.message)}</div>`;
   }
+}
+
+async function loadTopUsers() {
+  const area = $("#histArea");
+  area.innerHTML = '<p class="muted"><span class="spinner"></span> Đang tải…</p>';
+  try {
+    const rows = await api("/api/history/stats/top-users");
+    const table = el("table");
+    table.append(el("thead", {}, rowH(["#", "Người dùng", "Phòng ban", "Tổng lượt chạy", "Thành công", "Lỗi", "Gần nhất"])));
+    const tb = el("tbody");
+    rows.forEach((r, i) => {
+      const rank = i < 3 ? ["🥇", "🥈", "🥉"][i] : String(i + 1);
+      tb.append(el("tr", {},
+        el("td", { class: "num" }, rank),
+        td((r.fullName ? r.fullName + " " : "") + "(" + r.username + ")"),
+        td(r.department || "—"),
+        tdNum(r.totalRuns.toLocaleString("vi-VN")),
+        tdNum(r.successRuns.toLocaleString("vi-VN")),
+        tdNum(r.failedRuns.toLocaleString("vi-VN")),
+        td(r.lastRun ? new Date(r.lastRun).toLocaleString("vi-VN") : "—")));
+    });
+    if (rows.length === 0) tb.append(el("tr", {}, el("td", { colspan: 7, class: "muted" }, "Chưa có lượt chạy nào.")));
+    table.append(tb);
+    area.innerHTML = "";
+    area.append(el("p", { class: "page-sub" }, "Xếp hạng theo tổng số lần chạy báo cáo (nhiều nhất trước)."),
+      el("div", { class: "table-wrap" }, table));
+  } catch (ex) { area.innerHTML = `<div class="alert err">${esc(ex.message)}</div>`; }
 }
 
 async function rerunFromHistory(execId) {
@@ -667,27 +721,121 @@ async function adminUsers(body) {
   body.innerHTML = '<p class="muted"><span class="spinner"></span> Đang tải…</p>';
   try {
     const users = await api("/api/admin/users");
+
+    // ---- bộ lọc (phòng ban / vai trò / tìm tên) ----
+    const depts = [...new Set(users.map(u => u.department).filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi"));
+    const roles = [...new Set(users.flatMap(u => u.roles || []))].sort((a, b) => a.localeCompare(b, "vi"));
+    const fDept = el("select", {}, el("option", { value: "" }, "Tất cả phòng ban"),
+      ...depts.map(d => el("option", { value: d }, d)));
+    const fRole = el("select", {}, el("option", { value: "" }, "Tất cả vai trò"),
+      ...roles.map(r => el("option", { value: r }, r)));
+    const fSearch = el("input", { type: "search", placeholder: "🔍 Tìm tên đăng nhập / họ tên…", style: "min-width:220px" });
+
+    const countInfo = el("span", { class: "info" });
     const bar = el("div", { class: "toolbar" },
       el("button", { class: "btn primary", onclick: () => openCreateUser(body) }, "➕ Thêm mới tài khoản"),
       el("button", { class: "btn ghost", onclick: openOutbox }, "📧 Hộp thư (demo)"),
-      el("span", { class: "info" }, `${users.length} tài khoản`));
+      fDept, fRole, fSearch, countInfo);
+
     const table = el("table");
     table.append(el("thead", {}, rowH(["Tên ĐN", "Họ tên", "Phòng ban", "Vai trò", "Trạng thái", "Đăng nhập cuối", "Thao tác"])));
     const tb = el("tbody");
-    for (const u of users) {
-      const toggle = el("button", { class: "btn ghost sm", onclick: () => setActive(u.userId, !u.isActive) }, u.isActive ? "Khóa" : "Mở khóa");
-      const reset = el("button", { class: "btn ghost sm", onclick: () => resetPwd(u.userId, u.username) }, "Đổi MK");
-      tb.append(el("tr", {},
-        td(u.username), td(u.fullName || ""), td(u.department || ""),
-        td((u.roles || []).join(", ")),
-        el("td", {}, el("span", { class: "badge " + (u.isActive ? "ok" : "err") }, u.isActive ? "Hoạt động" : "Khóa")),
-        td(u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("vi-VN") : "—"),
-        el("td", {}, toggle, " ", reset)));
-    }
     table.append(tb);
+
+    const renderRows = () => {
+      const dq = fDept.value, rq = fRole.value, sq = fSearch.value.trim().toLowerCase();
+      tb.innerHTML = "";
+      const shown = users.filter(u =>
+        (!dq || u.department === dq) &&
+        (!rq || (u.roles || []).includes(rq)) &&
+        (!sq || (u.username + " " + (u.fullName || "")).toLowerCase().includes(sq)));
+      for (const u of shown) {
+        const toggle = el("button", { class: "btn ghost sm", onclick: () => setActive(u.userId, !u.isActive) }, u.isActive ? "Khóa" : "Mở khóa");
+        const reset = el("button", { class: "btn ghost sm", onclick: () => resetPwd(u.userId, u.username) }, "Đổi MK");
+        const perm = el("button", { class: "btn ghost sm", onclick: () => openUserPermissions(u) }, "🔑 Phân quyền");
+        tb.append(el("tr", {},
+          td(u.username), td(u.fullName || ""), td(u.department || ""),
+          td((u.roles || []).join(", ")),
+          el("td", {}, el("span", { class: "badge " + (u.isActive ? "ok" : "err") }, u.isActive ? "Hoạt động" : "Khóa")),
+          td(u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("vi-VN") : "—"),
+          el("td", {}, perm, " ", toggle, " ", reset)));
+      }
+      if (shown.length === 0) tb.append(el("tr", {}, el("td", { colspan: 7, class: "muted" }, "Không có tài khoản khớp bộ lọc.")));
+      countInfo.textContent = `${shown.length}/${users.length} tài khoản`;
+    };
+    fDept.onchange = renderRows; fRole.onchange = renderRows; fSearch.oninput = renderRows;
+
     body.innerHTML = "";
     body.append(bar, el("div", { class: "table-wrap" }, table));
+    renderRows();
   } catch (ex) { body.innerHTML = `<div class="alert err">${esc(ex.message)}</div>`; }
+}
+
+/* Modal gán quyền xem báo cáo cho từng người dùng (có checkbox theo nhóm). */
+async function openUserPermissions(u) {
+  let items;
+  try { items = await api(`/api/admin/users/${u.userId}/permissions`); }
+  catch (ex) { return toast(ex.message, "err"); }
+
+  const wrap = el("div", { class: "perm-wrap" });
+  wrap.append(el("p", { class: "muted", style: "font-size:13px" },
+    `Chọn các báo cáo mà `, el("b", {}, u.fullName || u.username),
+    ` được phép xem. Báo cáo đã được cấp qua vai trò hiển thị mờ (không bỏ được ở đây).`));
+
+  // gom theo nhóm
+  const groups = new Map();
+  for (const it of items) {
+    if (!groups.has(it.categoryId)) groups.set(it.categoryId, { name: it.categoryName, items: [] });
+    groups.get(it.categoryId).items.push(it);
+  }
+
+  const allBoxes = [];
+  for (const { name, items: gitems } of groups.values()) {
+    const groupCb = el("input", { type: "checkbox", class: "perm-group-cb" });
+    const childBoxes = [];
+    const childWrap = el("div", { class: "perm-children" });
+    for (const it of gitems) {
+      const viaRole = it.grantedViaRole;
+      const cb = el("input", {
+        type: "checkbox", value: it.templateId, "data-perm": "1",
+        ...(it.grantedDirect || viaRole ? { checked: "" } : {}),
+        ...(viaRole ? { disabled: "" } : {})
+      });
+      cb.dataset.viaRole = viaRole ? "1" : "0";
+      if (!viaRole) { childBoxes.push(cb); allBoxes.push(cb); }
+      childWrap.append(el("label", { class: "perm-item" }, cb,
+        el("span", {}, it.templateName),
+        viaRole ? el("span", { class: "badge mut", style: "margin-left:6px" }, "qua vai trò") : null));
+    }
+    const syncGroup = () => {
+      const on = childBoxes.filter(c => c.checked).length;
+      groupCb.checked = childBoxes.length > 0 && on === childBoxes.length;
+      groupCb.indeterminate = on > 0 && on < childBoxes.length;
+    };
+    groupCb.onchange = () => { childBoxes.forEach(c => c.checked = groupCb.checked); };
+    childBoxes.forEach(c => c.addEventListener("change", syncGroup));
+    syncGroup();
+    wrap.append(el("div", { class: "perm-group" },
+      el("label", { class: "perm-group-head" }, groupCb, el("b", {}, name)), childWrap));
+  }
+  if (groups.size === 0) wrap.append(el("div", { class: "muted" }, "Chưa có báo cáo nào được xuất bản."));
+
+  const err = el("div", { class: "alert err hidden" });
+  const save = el("button", { class: "btn primary" }, "💾 Lưu quyền");
+  wrap.append(err, el("div", { class: "toolbar" }, save));
+  const close = showModal("🔑 Phân quyền báo cáo — " + (u.fullName || u.username), wrap, { wide: true });
+
+  save.addEventListener("click", async () => {
+    err.classList.add("hidden");
+    const templateIds = allBoxes.filter(c => c.checked).map(c => parseInt(c.value, 10));
+    save.disabled = true; save.innerHTML = '<span class="spinner"></span> Đang lưu…';
+    try {
+      await api(`/api/admin/users/${u.userId}/permissions`, { method: "PUT", body: { templateIds } });
+      close();
+      toast(`Đã cập nhật quyền cho ${u.username} (${templateIds.length} báo cáo).`);
+    } catch (ex) { showErr(err, ex.message || "Lưu thất bại."); }
+    finally { save.disabled = false; save.innerHTML = "💾 Lưu quyền"; }
+  });
 }
 
 async function openCreateUser(body) {

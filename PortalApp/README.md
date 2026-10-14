@@ -11,11 +11,11 @@
 ### Tính năng đã hoàn thiện (đối chiếu đặc tả)
 - Đăng nhập JWT, băm mật khẩu PBKDF2, tự hết phiên khi rảnh 30'.
 - **Bắt buộc đổi mật khẩu lần đầu** (Admin tạo tài khoản / reset ⇒ ép đổi; chặn ở backend bằng 409).
-- Quản trị: CRUD người dùng + gán vai trò, **tự gửi email chào mừng** (SMTP/Pickup), test kết nối, **trình soạn/sửa SQL Template** (SQL Guard + versioning), Audit Log, hộp thư demo.
+- Quản trị: CRUD người dùng + gán vai trò, **lọc theo phòng ban/vai trò + tìm tên**, **phân quyền báo cáo theo từng người** (checkbox theo nhóm, chọn cả nhóm), **tự gửi email chào mừng** (SMTP/Pickup), test kết nối, **trình soạn/sửa SQL Template** (SQL Guard + versioning), Audit Log, hộp thư demo.
 - Chạy báo cáo: form tham số động, validate (bắt buộc/kiểu/min-max/độ dài, **từ ngày ≤ đến ngày**), parameter binding chống injection, timeout + giới hạn dòng.
 - Lưới kết quả: **phân trang + chọn số dòng/trang**, sắp xếp, tìm nhanh, **copy ô / dòng chọn / toàn bộ**, trạng thái rỗng/đang tải.
 - Xuất Excel `.xlsx`: sheet **Data** + sheet **Parameters** (báo cáo, người thực hiện, thời điểm, số dòng, thời gian chạy, tham số).
-- Lịch sử truy vấn (của tôi / toàn hệ thống) + chạy lại; mã hóa mật khẩu kết nối bằng Data Protection.
+- Lịch sử truy vấn (của tôi / toàn hệ thống) + chạy lại; lịch sử toàn hệ thống có **lọc theo người chạy, trạng thái (thành công/lỗi), sắp xếp theo thời điểm & thời lượng**, và **bảng xếp hạng người dùng chạy nhiều báo cáo nhất**; mã hóa mật khẩu kết nối bằng Data Protection.
 
 ### Giao diện
 Thiết kế theo phong cách **Data-Dense Dashboard** (bảng màu Analytics, font *Plus Jakarta Sans* + *JetBrains Mono*),
