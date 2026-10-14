@@ -10,11 +10,13 @@ public sealed class AdminService
 {
     private readonly IDbConnectionFactory _factory;
     private readonly ISecretProtector _protector;
+    private readonly ILogger<AdminService> _logger;
 
-    public AdminService(IDbConnectionFactory factory, ISecretProtector protector)
+    public AdminService(IDbConnectionFactory factory, ISecretProtector protector, ILogger<AdminService> logger)
     {
         _factory = factory;
         _protector = protector;
+        _logger = logger;
     }
 
     // ---- Users ----
@@ -267,7 +269,11 @@ public sealed class AdminService
         catch (Exception ex)
         {
             sw.Stop();
-            return new TestConnectionResult(false, "Kết nối thất bại: " + ex.Message, (int)sw.ElapsedMilliseconds);
+            // Không trả chi tiết lỗi của DB nguồn ra client (tránh lộ thông tin); ghi log phía server.
+            _logger.LogWarning(ex, "Test kết nối thất bại cho ConnectionId.");
+            return new TestConnectionResult(false,
+                "Kết nối thất bại. Kiểm tra máy chủ, cổng, tên database và tài khoản/mật khẩu.",
+                (int)sw.ElapsedMilliseconds);
         }
     }
 

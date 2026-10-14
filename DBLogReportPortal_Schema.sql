@@ -477,9 +477,10 @@ GO
 /* ---- 8.4 Tài khoản admin (placeholder hash - phải đổi khi triển khai) --- */
 IF NOT EXISTS (SELECT 1 FROM portal.Users WHERE Username = N'admin')
 BEGIN
-    INSERT INTO portal.Users (Username, FullName, Email, Department, PasswordHash, IsActive)
+    -- MustChangePassword = 1: buộc đổi mật khẩu khởi tạo ngay ở lần đăng nhập đầu.
+    INSERT INTO portal.Users (Username, FullName, Email, Department, PasswordHash, IsActive, MustChangePassword)
     VALUES (N'admin', N'Quản trị hệ thống', N'admin@local', N'IT',
-            N'PLACEHOLDER_SET_REAL_HASH_ON_DEPLOY', 1);
+            N'PLACEHOLDER_SET_REAL_HASH_ON_DEPLOY', 1, 1);
 
     INSERT INTO portal.UserRoles (UserId, RoleId)
     SELECT u.UserId, r.RoleId

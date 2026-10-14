@@ -8,7 +8,9 @@ namespace Portal.Api.Infrastructure;
 /// </summary>
 public static class PasswordHasher
 {
-    private const int Iterations = 100_000;
+    // OWASP 2023 khuyến nghị >= 600k vòng cho PBKDF2-HMAC-SHA256.
+    // Verify đọc số vòng từ hash đã lưu -> hash cũ (100k) vẫn xác thực được (nâng cấp trong suốt).
+    private const int Iterations = 600_000;
     private const int SaltSize = 16;   // 128-bit
     private const int KeySize = 32;    // 256-bit
 
