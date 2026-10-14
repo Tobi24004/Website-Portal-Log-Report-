@@ -811,7 +811,7 @@ async function adminUsers(body) {
     const countInfo = el("span", { class: "info" });
     const bar = el("div", { class: "toolbar" },
       el("button", { class: "btn primary", onclick: () => openCreateUser(body) }, "➕ Thêm mới tài khoản"),
-      el("button", { class: "btn ghost", onclick: () => openBulkImport(body) }, "⬆ Nhập hàng loạt (CSV)"),
+      el("button", { class: "btn ghost", onclick: () => openBulkImport(body) }, "⬆ Nhập hàng loạt"),
       el("button", { class: "btn ghost", onclick: openOutbox }, "📧 Hộp thư (demo)"),
       fDept, fRole, fSearch, countInfo);
 
@@ -1062,7 +1062,7 @@ async function openBulkImport(body) {
     el("label", { class: "check" }, sendEmail, "Gửi email chào mừng cho người có email"),
     err, preview,
     el("div", { class: "toolbar" }, importBtn));
-  const close = showModal("⬆ Nhập người dùng hàng loạt (CSV)", wrap, { wide: true });
+  const close = showModal("⬆ Nhập người dùng hàng loạt", wrap, { wide: true });
 
   importBtn.addEventListener("click", async () => {
     if (!parsed.length) return;
