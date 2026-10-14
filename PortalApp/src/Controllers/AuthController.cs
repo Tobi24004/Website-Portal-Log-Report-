@@ -32,8 +32,14 @@ public sealed class AuthController : ControllerBase
         return result.Status switch
         {
             LoginStatus.Success => Ok(result.Response),
+            LoginStatus.Disabled => StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                accountLocked = true,
+                message = "Tài khoản của bạn đang bị khóa. Vui lòng liên hệ quản trị viên để được mở khóa."
+            }),
             LoginStatus.Locked => StatusCode(StatusCodes.Status423Locked, new
             {
+                accountLocked = true,
                 message = $"Tài khoản tạm khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau {Math.Max(1, result.LockoutRemainingSeconds / 60)} phút."
             }),
             _ => Unauthorized(new { message = "Sai tên đăng nhập hoặc mật khẩu." })

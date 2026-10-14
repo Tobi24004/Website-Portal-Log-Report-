@@ -85,7 +85,15 @@ $("#loginForm").addEventListener("submit", async (e) => {
     localStorage.setItem("plr_token", data.token);
     await startApp();
   } catch (ex) {
-    errBox.textContent = ex.message || "Đăng nhập thất bại.";
+    // Tài khoản bị khóa -> hiển thị thông báo nổi bật (icon + nền cảnh báo).
+    if (ex && ex.accountLocked) {
+      errBox.className = "alert lock";
+      errBox.innerHTML = `<div class="lock-box"><span class="lock-ico">🔒</span><div>
+        <b>Tài khoản đang bị khóa</b><div class="lock-sub">${esc(ex.message || "")}</div></div></div>`;
+    } else {
+      errBox.className = "alert err";
+      errBox.textContent = ex.message || "Đăng nhập thất bại.";
+    }
     errBox.classList.remove("hidden");
   } finally {
     btn.disabled = false; btn.textContent = "Đăng nhập";

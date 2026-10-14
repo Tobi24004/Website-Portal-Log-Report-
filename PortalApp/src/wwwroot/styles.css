@@ -289,6 +289,12 @@ td.cell-copy:hover { background: #e0e7ff; }
 .perm-item input:disabled + span { color: var(--muted-fg); }
 @media (max-width: 640px) { .perm-children { grid-template-columns: 1fr; } }
 
+/* account-locked notice on the login screen */
+.alert.lock { background: #FEF3C7; border: 1px solid #FCD34D; color: #92400E; }
+.lock-box { display: flex; gap: 11px; align-items: flex-start; text-align: left; }
+.lock-ico { font-size: 22px; line-height: 1; }
+.lock-sub { font-size: 12.5px; margin-top: 3px; font-weight: 500; }
+
 /* password input + toggle row */
 .pwd-row { display: flex; gap: 8px; align-items: center; }
 .pwd-row input { flex: 1; }

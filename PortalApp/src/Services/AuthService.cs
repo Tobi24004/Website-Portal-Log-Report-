@@ -4,8 +4,8 @@ using Portal.Api.Models;
 
 namespace Portal.Api.Services;
 
-/// <summary>Kết quả đăng nhập, phân biệt sai thông tin vs. khóa tạm (chống brute-force).</summary>
-public enum LoginStatus { Success, InvalidCredentials, Locked }
+/// <summary>Kết quả đăng nhập: thành công / sai thông tin / khóa tạm brute-force / bị quản trị khóa.</summary>
+public enum LoginStatus { Success, InvalidCredentials, Locked, Disabled }
 public sealed record LoginResult(LoginStatus Status, LoginResponse? Response = null, int LockoutRemainingSeconds = 0);
 
 public sealed class AuthService
@@ -36,11 +36,12 @@ public sealed class AuthService
             WHERE Username = @Username AND IsDeleted = 0;
             """, new { Username = username });
 
-        // Tài khoản không tồn tại / bị khóa vĩnh viễn -> trả "sai thông tin" (tránh dò username).
-        if (row is null || !(bool)row.IsActive)
+        // Tài khoản không tồn tại -> trả "sai thông tin" (tránh dò username).
+        if (row is null)
             return new LoginResult(LoginStatus.InvalidCredentials);
 
         int userId = row.UserId;
+        bool isActive = row.IsActive;
         DateTime? lockoutUntil = row.LockoutUntil;
         int failed = row.FailedLoginCount;
         var now = DateTime.UtcNow;
@@ -75,7 +76,16 @@ public sealed class AuthService
             return new LoginResult(LoginStatus.InvalidCredentials);
         }
 
-        // Đúng mật khẩu -> xóa bộ đếm & khóa, cập nhật lần đăng nhập cuối.
+        // Mật khẩu đúng nhưng tài khoản bị quản trị khóa -> báo rõ ràng, không cấp token.
+        if (!isActive)
+        {
+            await conn.ExecuteAsync(
+                "UPDATE portal.Users SET FailedLoginCount = 0 WHERE UserId = @UserId;", new { UserId = userId });
+            await _audit.LogAsync(userId, "AUTH.LOGIN.DISABLED", "User", userId.ToString(), clientIp: clientIp);
+            return new LoginResult(LoginStatus.Disabled);
+        }
+
+        // Đúng mật khẩu & tài khoản còn hiệu lực -> xóa bộ đếm & khóa, cập nhật lần đăng nhập cuối.
         await conn.ExecuteAsync(
             "UPDATE portal.Users SET FailedLoginCount = 0, LockoutUntil = NULL, LastLoginAt = SYSUTCDATETIME() WHERE UserId = @UserId;",
             new { UserId = userId });
