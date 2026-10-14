@@ -243,6 +243,224 @@ IF @t IS NOT NULL AND NOT EXISTS (SELECT 1 FROM portal.ReportTemplateParameters 
 GO
 
 /* ============================================================================
+   6B. BÁO CÁO BỔ SUNG (thiết kế thêm)
+   ============================================================================ */
+
+/* ---- Doanh thu theo tháng (Sales) -------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_REVENUE_BY_MONTH')
+    INSERT INTO portal.ReportTemplates
+        (TemplateCode, TemplateName, Description, CategoryId, ConnectionId, SqlCommand,
+         MaxRows, TimeoutSeconds, AllowCopy, AllowExport, Status, CreatedBy)
+    SELECT N'RPT_REVENUE_BY_MONTH', N'Doanh thu theo tháng',
+           N'Tổng doanh thu và lợi nhuận gộp theo từng tháng.',
+           (SELECT CategoryId FROM portal.ReportCategories WHERE CategoryName = N'Báo cáo doanh thu'),
+           (SELECT ConnectionId FROM portal.DatabaseConnections WHERE ConnectionName = N'WideWorldImporters'),
+           N'SELECT FORMAT(i.InvoiceDate, ''yyyy-MM'') AS Thang,
+       COUNT(DISTINCT i.InvoiceID) AS SoHoaDon,
+       SUM(il.ExtendedPrice)       AS DoanhThu,
+       SUM(il.LineProfit)          AS LoiNhuan
+FROM Sales.Invoices i
+JOIN Sales.InvoiceLines il ON il.InvoiceID = i.InvoiceID
+WHERE i.InvoiceDate >= @StartDate AND i.InvoiceDate < DATEADD(DAY, 1, @EndDate)
+GROUP BY FORMAT(i.InvoiceDate, ''yyyy-MM'')
+ORDER BY Thang;',
+           50000, 45, 1, 1, N'Published', (SELECT UserId FROM portal.Users WHERE Username = N'admin');
+GO
+DECLARE @t INT = (SELECT TemplateId FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_REVENUE_BY_MONTH');
+IF @t IS NOT NULL AND NOT EXISTS (SELECT 1 FROM portal.ReportTemplateParameters WHERE TemplateId = @t)
+    INSERT INTO portal.ReportTemplateParameters
+        (TemplateId, ParameterName, DisplayName, DataType, InputType, IsRequired, DefaultValue, DisplayOrder)
+    VALUES
+        (@t, N'@StartDate', N'Từ ngày',  N'Date', N'Date', 1, NULL, 1),
+        (@t, N'@EndDate',   N'Đến ngày', N'Date', N'Date', 1, NULL, 2);
+GO
+
+/* ---- Doanh thu theo nhân viên bán hàng (Sales) ------------------------- */
+IF NOT EXISTS (SELECT 1 FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_SALES_BY_SALESPERSON')
+    INSERT INTO portal.ReportTemplates
+        (TemplateCode, TemplateName, Description, CategoryId, ConnectionId, SqlCommand,
+         MaxRows, TimeoutSeconds, AllowCopy, AllowExport, Status, CreatedBy)
+    SELECT N'RPT_SALES_BY_SALESPERSON', N'Doanh thu theo nhân viên bán hàng',
+           N'Doanh thu, lợi nhuận và số hóa đơn của từng nhân viên bán hàng.',
+           (SELECT CategoryId FROM portal.ReportCategories WHERE CategoryName = N'Báo cáo doanh thu'),
+           (SELECT ConnectionId FROM portal.DatabaseConnections WHERE ConnectionName = N'WideWorldImporters'),
+           N'SELECT p.FullName AS NhanVienBanHang,
+       COUNT(DISTINCT i.InvoiceID) AS SoHoaDon,
+       SUM(il.ExtendedPrice)       AS DoanhThu,
+       SUM(il.LineProfit)          AS LoiNhuan
+FROM Sales.Invoices i
+JOIN Sales.InvoiceLines il ON il.InvoiceID = i.InvoiceID
+JOIN Application.People p   ON p.PersonID = i.SalespersonPersonID
+WHERE i.InvoiceDate >= @StartDate AND i.InvoiceDate < DATEADD(DAY, 1, @EndDate)
+GROUP BY p.FullName
+ORDER BY DoanhThu DESC;',
+           50000, 45, 1, 1, N'Published', (SELECT UserId FROM portal.Users WHERE Username = N'admin');
+GO
+DECLARE @t INT = (SELECT TemplateId FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_SALES_BY_SALESPERSON');
+IF @t IS NOT NULL AND NOT EXISTS (SELECT 1 FROM portal.ReportTemplateParameters WHERE TemplateId = @t)
+    INSERT INTO portal.ReportTemplateParameters
+        (TemplateId, ParameterName, DisplayName, DataType, InputType, IsRequired, DefaultValue, DisplayOrder)
+    VALUES
+        (@t, N'@StartDate', N'Từ ngày',  N'Date', N'Date', 1, NULL, 1),
+        (@t, N'@EndDate',   N'Đến ngày', N'Date', N'Date', 1, NULL, 2);
+GO
+
+/* ---- Lợi nhuận theo sản phẩm Top N (Sales) ----------------------------- */
+IF NOT EXISTS (SELECT 1 FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_PROFIT_BY_PRODUCT')
+    INSERT INTO portal.ReportTemplates
+        (TemplateCode, TemplateName, Description, CategoryId, ConnectionId, SqlCommand,
+         MaxRows, TimeoutSeconds, AllowCopy, AllowExport, Status, CreatedBy)
+    SELECT N'RPT_PROFIT_BY_PRODUCT', N'Lợi nhuận theo sản phẩm (Top N)',
+           N'Top N sản phẩm theo lợi nhuận gộp trong kỳ.',
+           (SELECT CategoryId FROM portal.ReportCategories WHERE CategoryName = N'Báo cáo doanh thu'),
+           (SELECT ConnectionId FROM portal.DatabaseConnections WHERE ConnectionName = N'WideWorldImporters'),
+           N'SELECT TOP (@TopN) si.StockItemID, si.StockItemName AS SanPham,
+       SUM(il.Quantity)      AS SoLuong,
+       SUM(il.ExtendedPrice) AS DoanhThu,
+       SUM(il.LineProfit)    AS LoiNhuan
+FROM Sales.InvoiceLines il
+JOIN Sales.Invoices i        ON i.InvoiceID = il.InvoiceID
+JOIN Warehouse.StockItems si ON si.StockItemID = il.StockItemID
+WHERE i.InvoiceDate >= @StartDate AND i.InvoiceDate < DATEADD(DAY, 1, @EndDate)
+GROUP BY si.StockItemID, si.StockItemName
+ORDER BY LoiNhuan DESC;',
+           50000, 45, 1, 1, N'Published', (SELECT UserId FROM portal.Users WHERE Username = N'admin');
+GO
+DECLARE @t INT = (SELECT TemplateId FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_PROFIT_BY_PRODUCT');
+IF @t IS NOT NULL AND NOT EXISTS (SELECT 1 FROM portal.ReportTemplateParameters WHERE TemplateId = @t)
+    INSERT INTO portal.ReportTemplateParameters
+        (TemplateId, ParameterName, DisplayName, DataType, InputType, IsRequired, DefaultValue, DisplayOrder, MinValue, MaxValue)
+    VALUES
+        (@t, N'@StartDate', N'Từ ngày',  N'Date',    N'Date',   1, NULL,   1, NULL, NULL),
+        (@t, N'@EndDate',   N'Đến ngày', N'Date',    N'Date',   1, NULL,   2, NULL, NULL),
+        (@t, N'@TopN',      N'Số sản phẩm (Top)', N'Integer', N'Number', 1, N'10', 3, N'1', N'100');
+GO
+
+/* ---- Top khách hàng theo doanh thu (Sales) ----------------------------- */
+IF NOT EXISTS (SELECT 1 FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_TOP_CUSTOMERS')
+    INSERT INTO portal.ReportTemplates
+        (TemplateCode, TemplateName, Description, CategoryId, ConnectionId, SqlCommand,
+         MaxRows, TimeoutSeconds, AllowCopy, AllowExport, Status, CreatedBy)
+    SELECT N'RPT_TOP_CUSTOMERS', N'Top khách hàng theo doanh thu',
+           N'Top N khách hàng theo doanh thu trong kỳ.',
+           (SELECT CategoryId FROM portal.ReportCategories WHERE CategoryName = N'Báo cáo khách hàng'),
+           (SELECT ConnectionId FROM portal.DatabaseConnections WHERE ConnectionName = N'WideWorldImporters'),
+           N'SELECT TOP (@TopN) c.CustomerID, c.CustomerName AS KhachHang,
+       COUNT(DISTINCT i.InvoiceID) AS SoHoaDon,
+       SUM(il.ExtendedPrice)       AS DoanhThu
+FROM Sales.Invoices i
+JOIN Sales.InvoiceLines il ON il.InvoiceID = i.InvoiceID
+JOIN Sales.Customers c     ON c.CustomerID = i.CustomerID
+WHERE i.InvoiceDate >= @StartDate AND i.InvoiceDate < DATEADD(DAY, 1, @EndDate)
+GROUP BY c.CustomerID, c.CustomerName
+ORDER BY DoanhThu DESC;',
+           50000, 45, 1, 1, N'Published', (SELECT UserId FROM portal.Users WHERE Username = N'admin');
+GO
+DECLARE @t INT = (SELECT TemplateId FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_TOP_CUSTOMERS');
+IF @t IS NOT NULL AND NOT EXISTS (SELECT 1 FROM portal.ReportTemplateParameters WHERE TemplateId = @t)
+    INSERT INTO portal.ReportTemplateParameters
+        (TemplateId, ParameterName, DisplayName, DataType, InputType, IsRequired, DefaultValue, DisplayOrder, MinValue, MaxValue)
+    VALUES
+        (@t, N'@StartDate', N'Từ ngày',  N'Date',    N'Date',   1, NULL,   1, NULL, NULL),
+        (@t, N'@EndDate',   N'Đến ngày', N'Date',    N'Date',   1, NULL,   2, NULL, NULL),
+        (@t, N'@TopN',      N'Số khách hàng (Top)', N'Integer', N'Number', 1, N'10', 3, N'1', N'100');
+GO
+
+/* ---- Công nợ khách hàng (Sales) ---------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_CUSTOMER_OUTSTANDING')
+    INSERT INTO portal.ReportTemplates
+        (TemplateCode, TemplateName, Description, CategoryId, ConnectionId, SqlCommand,
+         MaxRows, TimeoutSeconds, AllowCopy, AllowExport, Status, CreatedBy)
+    SELECT N'RPT_CUSTOMER_OUTSTANDING', N'Công nợ khách hàng',
+           N'Số dư công nợ (net) theo khách hàng; lọc theo ngưỡng tối thiểu.',
+           (SELECT CategoryId FROM portal.ReportCategories WHERE CategoryName = N'Báo cáo khách hàng'),
+           (SELECT ConnectionId FROM portal.DatabaseConnections WHERE ConnectionName = N'WideWorldImporters'),
+           N'SELECT c.CustomerID, c.CustomerName AS KhachHang,
+       SUM(ct.TransactionAmount) AS CongNo
+FROM Sales.CustomerTransactions ct
+JOIN Sales.Customers c ON c.CustomerID = ct.CustomerID
+GROUP BY c.CustomerID, c.CustomerName
+HAVING SUM(ct.TransactionAmount) >= @MinBalance
+ORDER BY CongNo DESC;',
+           50000, 45, 1, 1, N'Published', (SELECT UserId FROM portal.Users WHERE Username = N'admin');
+GO
+DECLARE @t INT = (SELECT TemplateId FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_CUSTOMER_OUTSTANDING');
+IF @t IS NOT NULL AND NOT EXISTS (SELECT 1 FROM portal.ReportTemplateParameters WHERE TemplateId = @t)
+    INSERT INTO portal.ReportTemplateParameters
+        (TemplateId, ParameterName, DisplayName, DataType, InputType, IsRequired, DefaultValue, DisplayOrder)
+    VALUES
+        (@t, N'@MinBalance', N'Công nợ tối thiểu', N'Decimal', N'Number', 1, N'0', 1);
+GO
+
+/* ---- Đơn hàng chưa hoàn tất lấy hàng (Sales) --------------------------- */
+IF NOT EXISTS (SELECT 1 FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_ORDERS_PENDING')
+    INSERT INTO portal.ReportTemplates
+        (TemplateCode, TemplateName, Description, CategoryId, ConnectionId, SqlCommand,
+         MaxRows, TimeoutSeconds, AllowCopy, AllowExport, Status, CreatedBy)
+    SELECT N'RPT_ORDERS_PENDING', N'Đơn hàng chưa hoàn tất lấy hàng',
+           N'Đơn hàng chưa hoàn tất picking tính đến ngày chỉ định.',
+           (SELECT CategoryId FROM portal.ReportCategories WHERE CategoryName = N'Báo cáo giao dịch'),
+           (SELECT ConnectionId FROM portal.DatabaseConnections WHERE ConnectionName = N'WideWorldImporters'),
+           N'SELECT o.OrderID, o.OrderDate, o.ExpectedDeliveryDate,
+       c.CustomerName AS KhachHang, p.FullName AS NhanVienBanHang,
+       o.CustomerPurchaseOrderNumber AS SoPO_KhachHang
+FROM Sales.Orders o
+JOIN Sales.Customers c    ON c.CustomerID = o.CustomerID
+JOIN Application.People p ON p.PersonID = o.SalespersonPersonID
+WHERE o.PickingCompletedWhen IS NULL AND o.OrderDate <= @AsOfDate
+ORDER BY o.ExpectedDeliveryDate ASC;',
+           50000, 45, 1, 1, N'Published', (SELECT UserId FROM portal.Users WHERE Username = N'admin');
+GO
+DECLARE @t INT = (SELECT TemplateId FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_ORDERS_PENDING');
+IF @t IS NOT NULL AND NOT EXISTS (SELECT 1 FROM portal.ReportTemplateParameters WHERE TemplateId = @t)
+    INSERT INTO portal.ReportTemplateParameters
+        (TemplateId, ParameterName, DisplayName, DataType, InputType, IsRequired, DefaultValue, DisplayOrder)
+    VALUES
+        (@t, N'@AsOfDate', N'Tính đến ngày', N'Date', N'Date', 1, NULL, 1);
+GO
+
+/* ---- Giá trị tồn kho theo sản phẩm (Warehouse) ------------------------- */
+IF NOT EXISTS (SELECT 1 FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_STOCK_VALUATION')
+    INSERT INTO portal.ReportTemplates
+        (TemplateCode, TemplateName, Description, CategoryId, ConnectionId, SqlCommand,
+         MaxRows, TimeoutSeconds, AllowCopy, AllowExport, Status, CreatedBy)
+    SELECT N'RPT_STOCK_VALUATION', N'Giá trị tồn kho theo sản phẩm',
+           N'Tồn kho hiện tại, giá vốn và giá trị tồn kho từng sản phẩm.',
+           (SELECT CategoryId FROM portal.ReportCategories WHERE CategoryName = N'Báo cáo kho'),
+           (SELECT ConnectionId FROM portal.DatabaseConnections WHERE ConnectionName = N'WideWorldImporters'),
+           N'SELECT si.StockItemID, si.StockItemName AS SanPham,
+       sih.QuantityOnHand AS TonKho,
+       sih.LastCostPrice  AS GiaVon,
+       (sih.QuantityOnHand * sih.LastCostPrice) AS GiaTriTonKho
+FROM Warehouse.StockItems si
+JOIN Warehouse.StockItemHoldings sih ON sih.StockItemID = si.StockItemID
+ORDER BY GiaTriTonKho DESC;',
+           50000, 45, 1, 1, N'Published', (SELECT UserId FROM portal.Users WHERE Username = N'admin');
+GO
+
+/* ---- Đơn mua chưa nhận đủ hàng (Purchasing) ---------------------------- */
+IF NOT EXISTS (SELECT 1 FROM portal.ReportTemplates WHERE TemplateCode = N'RPT_PO_OUTSTANDING')
+    INSERT INTO portal.ReportTemplates
+        (TemplateCode, TemplateName, Description, CategoryId, ConnectionId, SqlCommand,
+         MaxRows, TimeoutSeconds, AllowCopy, AllowExport, Status, CreatedBy)
+    SELECT N'RPT_PO_OUTSTANDING', N'Đơn mua chưa nhận đủ hàng',
+           N'Các dòng đơn mua có số lượng nhận ít hơn số lượng đặt.',
+           (SELECT CategoryId FROM portal.ReportCategories WHERE CategoryName = N'Báo cáo mua hàng'),
+           (SELECT ConnectionId FROM portal.DatabaseConnections WHERE ConnectionName = N'WideWorldImporters'),
+           N'SELECT po.PurchaseOrderID, po.OrderDate, po.ExpectedDeliveryDate,
+       s.SupplierName AS NhaCungCap, si.StockItemName AS SanPham,
+       pol.OrderedOuters AS DaDat, pol.ReceivedOuters AS DaNhan,
+       (pol.OrderedOuters - pol.ReceivedOuters) AS ConLai
+FROM Purchasing.PurchaseOrderLines pol
+JOIN Purchasing.PurchaseOrders po ON po.PurchaseOrderID = pol.PurchaseOrderID
+JOIN Purchasing.Suppliers s       ON s.SupplierID = po.SupplierID
+JOIN Warehouse.StockItems si      ON si.StockItemID = pol.StockItemID
+WHERE pol.ReceivedOuters < pol.OrderedOuters
+ORDER BY po.ExpectedDeliveryDate ASC;',
+           50000, 45, 1, 1, N'Published', (SELECT UserId FROM portal.Users WHERE Username = N'admin');
+GO
+
+/* ============================================================================
    7. CẤP QUYỀN: ROLE PHÒNG BAN -> BÁO CÁO
    ============================================================================ */
 
@@ -258,16 +476,24 @@ INSERT INTO #Map (RoleName, TemplateCode) VALUES
  (N'Sales_User', N'RPT_CUSTOMER_TRANSACTIONS'),
  (N'Sales_User', N'RPT_CUSTOMER_BY_REGION'),
  (N'Sales_User', N'RPT_TOP_PRODUCTS'),
+ (N'Sales_User', N'RPT_REVENUE_BY_MONTH'),
+ (N'Sales_User', N'RPT_SALES_BY_SALESPERSON'),
+ (N'Sales_User', N'RPT_PROFIT_BY_PRODUCT'),
+ (N'Sales_User', N'RPT_TOP_CUSTOMERS'),
+ (N'Sales_User', N'RPT_CUSTOMER_OUTSTANDING'),
+ (N'Sales_User', N'RPT_ORDERS_PENDING'),
  -- Phòng Kho bãi
  (N'Warehouse_User', N'RPT_STOCK_ON_HAND'),
  (N'Warehouse_User', N'RPT_STOCK_REORDER'),
  (N'Warehouse_User', N'RPT_COLDROOM_TEMP_LOG'),
  (N'Warehouse_User', N'RPT_COLDROOM_TEMP_ANOMALY'),
  (N'Warehouse_User', N'RPT_STOCK_TRANSACTIONS'),
+ (N'Warehouse_User', N'RPT_STOCK_VALUATION'),
  -- Phòng Mua hàng
  (N'Purchasing_User', N'RPT_PURCHASE_ORDERS'),
  (N'Purchasing_User', N'RPT_SUPPLIERS'),
- (N'Purchasing_User', N'RPT_PURCHASE_BY_SUPPLIER');
+ (N'Purchasing_User', N'RPT_PURCHASE_BY_SUPPLIER'),
+ (N'Purchasing_User', N'RPT_PO_OUTSTANDING');
 
 -- Manager: xem tất cả báo cáo nghiệp vụ (union mọi template ở trên)
 INSERT INTO #Map (RoleName, TemplateCode)
