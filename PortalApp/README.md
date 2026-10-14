@@ -97,20 +97,21 @@ Dừng: `docker compose down` (thêm `-v` để xóa cả volume khóa mã hóa)
 
 ---
 
-## 4. Tài khoản demo
+## 4. Tài khoản quản trị
 
-Khi khởi động lần đầu, ứng dụng tự **băm mật khẩu** cho các tài khoản còn
+Khi khởi động lần đầu, ứng dụng tự **băm mật khẩu** cho tài khoản còn
 placeholder và **mã hóa mật khẩu** kết nối `portal_readonly`.
 
-| Tài khoản | Mật khẩu | Vai trò | Báo cáo thấy được |
+| Tài khoản | Mật khẩu | Vai trò | Quyền |
 |---|---|---|---|
-| `admin` | `Admin@123` | Admin | Tất cả + trang Quản trị |
-| `sales01` | `Portal@123` | Sales_User | 6 báo cáo kinh doanh/khách hàng |
-| `warehouse01` | `Portal@123` | Warehouse_User | 5 báo cáo kho |
-| `purchasing01` | `Portal@123` | Purchasing_User | 3 báo cáo mua hàng |
-| `manager01` | `Portal@123` | Manager | Toàn bộ báo cáo nghiệp vụ + lịch sử toàn hệ thống |
+| `admin` | `Admin@123` | Admin | Tất cả báo cáo + trang Quản trị |
 
-> Đổi mật khẩu/secret trong `PortalApp/.env` trước khi dùng thật.
+Các tài khoản người dùng theo phòng ban (Sales / Warehouse / Purchasing /
+Manager) được tạo từ trang **Quản trị → Người dùng**; khi tạo, hệ thống gửi
+email chào mừng và **bắt buộc đổi mật khẩu ở lần đăng nhập đầu**.
+
+> Đổi mật khẩu `admin` ngay sau lần đăng nhập đầu, và đổi secret trong
+> `PortalApp/.env` trước khi dùng thật.
 
 ---
 
