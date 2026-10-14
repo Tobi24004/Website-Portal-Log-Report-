@@ -271,6 +271,7 @@ BEGIN
         UserId     INT          NULL,          -- ... hoặc cho người dùng cụ thể
         GrantedAt  DATETIME2(3) NOT NULL CONSTRAINT DF_TplPerm_GrantedAt DEFAULT (SYSUTCDATETIME()),
         GrantedBy  INT          NULL,
+        IsDeny     BIT          NOT NULL CONSTRAINT DF_TplPerm_IsDeny DEFAULT (0), -- chặn riêng cho user (ghi đè quyền theo vai trò)
         CONSTRAINT PK_ReportTemplatePermissions PRIMARY KEY CLUSTERED (GrantId),
         CONSTRAINT FK_TplPerm_Template FOREIGN KEY (TemplateId) REFERENCES portal.ReportTemplates(TemplateId) ON DELETE CASCADE,
         CONSTRAINT FK_TplPerm_Role     FOREIGN KEY (RoleId)     REFERENCES portal.Roles(RoleId),

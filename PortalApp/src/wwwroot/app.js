@@ -857,8 +857,9 @@ async function openUserPermissions(u) {
 
   const wrap = el("div", { class: "perm-wrap" });
   wrap.append(el("p", { class: "muted", style: "font-size:13px" },
-    `Chọn các báo cáo mà `, el("b", {}, u.fullName || u.username),
-    ` được phép xem. Báo cáo đã được cấp qua vai trò hiển thị mờ (không bỏ được ở đây).`));
+    `Tick = `, el("b", {}, u.fullName || u.username), ` được xem báo cáo đó. `,
+    `Báo cáo gắn nhãn `, el("span", { class: "badge mut" }, "theo vai trò"),
+    ` mặc định có sẵn từ vai trò — bỏ tick sẽ `, el("b", {}, "chặn riêng"), ` cho người này.`));
 
   // gom theo nhóm
   const groups = new Map();
@@ -873,17 +874,14 @@ async function openUserPermissions(u) {
     const childBoxes = [];
     const childWrap = el("div", { class: "perm-children" });
     for (const it of gitems) {
-      const viaRole = it.grantedViaRole;
       const cb = el("input", {
         type: "checkbox", value: it.templateId, "data-perm": "1",
-        ...(it.grantedDirect || viaRole ? { checked: "" } : {}),
-        ...(viaRole ? { disabled: "" } : {})
+        ...(it.grantedEffective ? { checked: "" } : {})
       });
-      cb.dataset.viaRole = viaRole ? "1" : "0";
-      if (!viaRole) { childBoxes.push(cb); allBoxes.push(cb); }
+      childBoxes.push(cb); allBoxes.push(cb);
       childWrap.append(el("label", { class: "perm-item" }, cb,
         el("span", {}, it.templateName),
-        viaRole ? el("span", { class: "badge mut", style: "margin-left:6px" }, "qua vai trò") : null));
+        it.grantedViaRole ? el("span", { class: "badge mut", style: "margin-left:auto" }, "theo vai trò") : null));
     }
     const syncGroup = () => {
       const on = childBoxes.filter(c => c.checked).length;

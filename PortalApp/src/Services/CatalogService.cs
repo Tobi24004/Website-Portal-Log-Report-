@@ -84,14 +84,23 @@ public sealed class CatalogService
             (bool)t.AllowCopy, (bool)t.AllowExport, (int)t.MaxRows, (int)t.TimeoutSeconds, parameters);
     }
 
-    /// <summary>Điều kiện SQL: người dùng được cấp quyền báo cáo (trực tiếp hoặc qua vai trò), hoặc có quyền quản trị template.</summary>
+    /// <summary>
+    /// Điều kiện SQL: xem được báo cáo khi có quyền quản trị, HOẶC (được cấp trực tiếp / qua vai trò)
+    /// VÀ không bị chặn riêng (IsDeny) cho người dùng đó. Chặn riêng ghi đè quyền theo vai trò.
+    /// </summary>
     private static string AccessPredicate(string tplAlias) =>
         $"""
-        @CanSeeAll = 1 OR EXISTS (
-            SELECT 1 FROM portal.ReportTemplatePermissions g
-            LEFT JOIN portal.UserRoles ur ON ur.RoleId = g.RoleId AND ur.UserId = @UserId
-            WHERE g.TemplateId = {tplAlias}.TemplateId
-              AND ((g.UserId = @UserId) OR (g.RoleId IS NOT NULL AND ur.UserId IS NOT NULL))
+        @CanSeeAll = 1 OR (
+            EXISTS (
+                SELECT 1 FROM portal.ReportTemplatePermissions g
+                LEFT JOIN portal.UserRoles ur ON ur.RoleId = g.RoleId AND ur.UserId = @UserId
+                WHERE g.TemplateId = {tplAlias}.TemplateId
+                  AND ((g.UserId = @UserId AND g.IsDeny = 0) OR (g.RoleId IS NOT NULL AND ur.UserId IS NOT NULL))
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM portal.ReportTemplatePermissions d
+                WHERE d.TemplateId = {tplAlias}.TemplateId AND d.UserId = @UserId AND d.IsDeny = 1
+            )
         )
         """;
 }

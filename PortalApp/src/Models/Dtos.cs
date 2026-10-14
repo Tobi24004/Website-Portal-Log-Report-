@@ -99,7 +99,7 @@ public sealed record SqlValidateResult(bool Ok, string? Reason);
 public sealed record UserPermissionItem(
     int TemplateId, string TemplateCode, string TemplateName,
     int CategoryId, string CategoryName,
-    bool GrantedDirect, bool GrantedViaRole);
+    bool GrantedEffective, bool GrantedViaRole);
 public sealed record SetUserPermissionsRequest(int[]? TemplateIds);
 
 // ---- Lịch sử: thống kê người dùng chạy nhiều báo cáo nhất ----
