@@ -59,6 +59,17 @@ public sealed record ResetPasswordRequest(string NewPassword);
 public sealed record SetActiveRequest(bool IsActive);
 public sealed record TestConnectionResult(bool Ok, string Message, int DurationMs);
 
+// ---- Admin: nhập người dùng hàng loạt (CSV) ----
+public sealed record BulkUserRow(
+    string? Username, string? FullName, string? Email, string? Department,
+    string? Roles, string? Password);
+public sealed record BulkImportRequest(BulkUserRow[]? Users, bool SendEmail);
+public sealed record BulkRowResult(int Row, string Username, bool Created, string Status);
+public sealed record WelcomePayload(string Email, string? FullName, string Username, string Password);
+public sealed record BulkCreateOutcome(
+    IReadOnlyList<BulkRowResult> Results, IReadOnlyList<WelcomePayload> ToEmail);
+public sealed record BulkImportResponse(int Created, int Failed, IReadOnlyList<BulkRowResult> Results);
+
 // ---- Admin: SQL Template CRUD ----
 public sealed record Lookup(int Id, string Name);
 public sealed record AdminLookups(

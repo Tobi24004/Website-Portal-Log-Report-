@@ -68,6 +68,61 @@ public sealed class AdminService
         return userId;
     }
 
+    /// <summary>Tạo nhiều tài khoản từ danh sách (CSV). Mỗi dòng độc lập: lỗi 1 dòng không chặn các dòng khác.</summary>
+    public async Task<BulkCreateOutcome> BulkCreateUsersAsync(BulkUserRow[] rows, int actingUserId)
+    {
+        var results = new List<BulkRowResult>();
+        var toEmail = new List<WelcomePayload>();
+        using var conn = _factory.CreateMeta();
+        conn.Open();
+        var validRoles = (await conn.QueryAsync<string>(
+            "SELECT RoleName FROM portal.Roles WHERE IsDeleted = 0;")).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        for (int i = 0; i < rows.Length; i++)
+        {
+            var r = rows[i];
+            int rowNo = i + 1;
+            var username = (r.Username ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(username)) { results.Add(new(rowNo, "(trống)", false, "lỗi: thiếu Username")); continue; }
+            try
+            {
+                using var tx = conn.BeginTransaction();
+                var exists = await conn.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(1) FROM portal.Users WHERE Username = @U AND IsDeleted = 0;", new { U = username }, tx);
+                if (exists > 0) { tx.Rollback(); results.Add(new(rowNo, username, false, "bỏ qua: đã tồn tại")); continue; }
+
+                var pwd = string.IsNullOrWhiteSpace(r.Password) ? "Temp@123456" : r.Password.Trim();
+                var email = string.IsNullOrWhiteSpace(r.Email) ? null : r.Email.Trim();
+                var userId = await conn.ExecuteScalarAsync<int>(
+                    """
+                    INSERT INTO portal.Users (Username, FullName, Email, Department, PasswordHash, IsActive, MustChangePassword, CreatedBy)
+                    OUTPUT INSERTED.UserId
+                    VALUES (@Username, @FullName, @Email, @Department, @Hash, 1, 1, @By);
+                    """,
+                    new { Username = username, FullName = r.FullName?.Trim(), Email = email,
+                          Department = r.Department?.Trim(), Hash = PasswordHasher.Hash(pwd), By = actingUserId }, tx);
+
+                var roleNames = (r.Roles ?? "")
+                    .Split(new[] { ';', ',', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(x => validRoles.Contains(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                if (roleNames.Length > 0)
+                    await conn.ExecuteAsync(
+                        """
+                        INSERT INTO portal.UserRoles (UserId, RoleId, AssignedBy)
+                        SELECT @UserId, r.RoleId, @By FROM portal.Roles r
+                        WHERE r.RoleName IN @Roles AND r.IsDeleted = 0;
+                        """, new { UserId = userId, By = actingUserId, Roles = roleNames }, tx);
+                tx.Commit();
+
+                results.Add(new(rowNo, username, true,
+                    roleNames.Length > 0 ? $"tạo thành công ({string.Join(", ", roleNames)})" : "tạo thành công (chưa gán vai trò)"));
+                if (email != null) toEmail.Add(new(email, r.FullName?.Trim(), username, pwd));
+            }
+            catch (Exception ex) { results.Add(new(rowNo, username, false, "lỗi: " + ex.Message)); }
+        }
+        return new BulkCreateOutcome(results, toEmail);
+    }
+
     public async Task ResetPasswordAsync(int userId, string newPassword, int actingUserId)
     {
         using var conn = _factory.CreateMeta();

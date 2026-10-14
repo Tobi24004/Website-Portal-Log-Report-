@@ -56,6 +56,32 @@ public sealed class AdminController : ControllerBase
         }
     }
 
+    [HttpPost("users/bulk")]
+    [Authorize(Policy = "USER.MANAGE")]
+    public async Task<IActionResult> BulkImport([FromBody] BulkImportRequest req)
+    {
+        if (req.Users is not { Length: > 0 })
+            return BadRequest(new { message = "Không có dòng dữ liệu nào để nhập." });
+        if (req.Users.Length > 1000)
+            return BadRequest(new { message = "Tối đa 1000 dòng mỗi lần nhập." });
+
+        var outcome = await _admin.BulkCreateUsersAsync(req.Users, User.GetUserId());
+        var created = outcome.Results.Count(r => r.Created);
+
+        if (req.SendEmail)
+            foreach (var w in outcome.ToEmail)
+            {
+                var (subject, html) = WelcomeEmail.Build(w.Username, w.FullName, w.Password, _email.LoginUrl);
+                await _email.SendAsync(w.Email, w.FullName ?? w.Username, subject, html);
+            }
+
+        await _audit.LogAsync(User.GetUserId(), "USER.BULK_IMPORT", "User", null,
+            newValue: $"created={created}, failed={req.Users.Length - created}, email={(req.SendEmail ? "on" : "off")}",
+            clientIp: HttpContext.ClientIp());
+
+        return Ok(new BulkImportResponse(created, req.Users.Length - created, outcome.Results));
+    }
+
     [HttpGet("outbox")]
     [Authorize(Policy = "USER.MANAGE")]
     public IActionResult Outbox() => Ok(_email.RecentOutbox());

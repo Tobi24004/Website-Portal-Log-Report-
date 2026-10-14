@@ -811,6 +811,7 @@ async function adminUsers(body) {
     const countInfo = el("span", { class: "info" });
     const bar = el("div", { class: "toolbar" },
       el("button", { class: "btn primary", onclick: () => openCreateUser(body) }, "➕ Thêm mới tài khoản"),
+      el("button", { class: "btn ghost", onclick: () => openBulkImport(body) }, "⬆ Nhập hàng loạt (CSV)"),
       el("button", { class: "btn ghost", onclick: openOutbox }, "📧 Hộp thư (demo)"),
       fDept, fRole, fSearch, countInfo);
 
@@ -958,6 +959,137 @@ async function openCreateUser(body) {
     } catch (ex) { showErr(err, ex.message || "Tạo tài khoản thất bại."); }
     finally { save.disabled = false; save.innerHTML = "💾 Tạo tài khoản"; }
   });
+}
+
+/* ---- Nhập người dùng hàng loạt từ CSV ---- */
+const BULK_HEADERS = ["Username", "FullName", "Email", "Department", "Roles", "Password"];
+
+// Parser CSV nhỏ gọn: hỗ trợ ô có dấu phẩy/đóng mở ngoặc kép, xuống dòng CRLF/LF.
+function parseCsv(text) {
+  const rows = []; let row = [], cur = "", q = false;
+  text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += ch;
+    } else {
+      if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cur); cur = ""; }
+      else if (ch === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+      else cur += ch;
+    }
+  }
+  if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ""));
+}
+
+// Chuyển các dòng CSV -> mảng object theo header (bỏ dấu để khớp linh hoạt).
+function csvToUsers(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) return { users: [], error: "File cần có dòng tiêu đề và ít nhất 1 dòng dữ liệu." };
+  const norm = (s) => s.trim().toLowerCase().replace(/\s+/g, "");
+  const header = rows[0].map(norm);
+  const idx = {};
+  BULK_HEADERS.forEach(h => { idx[h] = header.indexOf(norm(h)); });
+  if (idx.Username < 0) return { users: [], error: 'Thiếu cột "Username" trong tiêu đề.' };
+  const users = rows.slice(1).map(r => ({
+    username: (r[idx.Username] || "").trim(),
+    fullName: idx.FullName >= 0 ? (r[idx.FullName] || "").trim() : "",
+    email: idx.Email >= 0 ? (r[idx.Email] || "").trim() : "",
+    department: idx.Department >= 0 ? (r[idx.Department] || "").trim() : "",
+    roles: idx.Roles >= 0 ? (r[idx.Roles] || "").trim() : "",
+    password: idx.Password >= 0 ? (r[idx.Password] || "").trim() : ""
+  }));
+  return { users, error: null };
+}
+
+function downloadCsvTemplate() {
+  const sample = [
+    BULK_HEADERS.join(","),
+    'nguyenvanan,Nguyễn Văn An,nguyenvanan@congty.vn,Phòng Kinh doanh,Sales_User,',
+    'tranthibinh,Trần Thị Bình,tranthibinh@congty.vn,Phòng Kho bãi,Warehouse_User,',
+    'lehoangcuong,Lê Hoàng Cường,lehoangcuong@congty.vn,Phòng Mua hàng,Purchasing_User,'
+  ].join("\n");
+  const blob = new Blob(["﻿" + sample], { type: "text/csv;charset=utf-8" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: "mau-nhap-nguoi-dung.csv" });
+  document.body.append(a); a.click(); a.remove();
+}
+
+async function openBulkImport(body) {
+  const fileInput = el("input", { type: "file", accept: ".csv,text/csv" });
+  const textArea = el("textarea", { class: "sql", placeholder: "…hoặc dán nội dung CSV vào đây", style: "height:120px" });
+  const sendEmail = el("input", { type: "checkbox" });
+  const preview = el("div", {});
+  const err = el("div", { class: "alert err hidden" });
+  const importBtn = el("button", { class: "btn primary", disabled: "" }, "⬆ Nhập danh sách");
+  let parsed = [];
+
+  const refreshPreview = (text) => {
+    err.classList.add("hidden"); preview.innerHTML = "";
+    const { users, error } = csvToUsers(text);
+    if (error) { parsed = []; importBtn.disabled = true; return showErr(err, error); }
+    parsed = users;
+    const bad = users.filter(u => !u.username).length;
+    const table = el("table");
+    table.append(el("thead", {}, rowH(["#", "Username", "Họ tên", "Email", "Phòng ban", "Vai trò"])));
+    const tb = el("tbody");
+    users.slice(0, 50).forEach((u, i) => tb.append(el("tr", { ...(u.username ? {} : { class: "sel" }) },
+      td(i + 1), td(u.username || "⚠ thiếu"), td(u.fullName), td(u.email), td(u.department), td(u.roles))));
+    table.append(tb);
+    preview.append(
+      el("p", { class: "info", style: "margin:10px 0 6px" }, `Đọc được ${users.length} dòng` + (bad ? ` · ⚠ ${bad} dòng thiếu Username` : "") + (users.length > 50 ? " · xem trước 50 dòng đầu" : "")),
+      el("div", { class: "table-wrap" }, table));
+    importBtn.disabled = users.length === 0;
+  };
+
+  fileInput.onchange = () => {
+    const f = fileInput.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { textArea.value = rd.result; refreshPreview(rd.result); };
+    rd.readAsText(f, "utf-8");
+  };
+  textArea.oninput = () => refreshPreview(textArea.value);
+
+  const wrap = el("div", {},
+    el("p", { class: "muted", style: "font-size:13px" },
+      "Cột: ", el("code", { class: "inline" }, BULK_HEADERS.join(", ")),
+      ". Nhiều vai trò cách nhau bằng ", el("code", { class: "inline" }, ";"),
+      ". Để trống Password → mật khẩu tạm ", el("code", { class: "inline" }, "Temp@123456"),
+      " (buộc đổi lần đầu)."),
+    el("div", { class: "toolbar" },
+      el("button", { class: "btn ghost sm", type: "button", onclick: downloadCsvTemplate }, "⬇ Tải CSV mẫu"),
+      fileInput),
+    field("Nội dung CSV", textArea),
+    el("label", { class: "check" }, sendEmail, "Gửi email chào mừng cho người có email"),
+    err, preview,
+    el("div", { class: "toolbar" }, importBtn));
+  const close = showModal("⬆ Nhập người dùng hàng loạt (CSV)", wrap, { wide: true });
+
+  importBtn.addEventListener("click", async () => {
+    if (!parsed.length) return;
+    importBtn.disabled = true; importBtn.innerHTML = '<span class="spinner"></span> Đang nhập…';
+    try {
+      const res = await api("/api/admin/users/bulk", { method: "POST", body: { users: parsed, sendEmail: sendEmail.checked } });
+      close();
+      showBulkResult(res);
+      adminUsers(body);
+    } catch (ex) { showErr(err, ex.message || "Nhập thất bại."); importBtn.disabled = false; importBtn.innerHTML = "⬆ Nhập danh sách"; }
+  });
+}
+
+function showBulkResult(res) {
+  const table = el("table");
+  table.append(el("thead", {}, rowH(["Dòng", "Username", "Kết quả"])));
+  const tb = el("tbody");
+  res.results.forEach(r => tb.append(el("tr", { ...(r.created ? {} : { class: "sel" }) },
+    td(r.row), td(r.username),
+    el("td", {}, el("span", { class: "badge " + (r.created ? "ok" : (r.status.startsWith("bỏ qua") ? "warn" : "err")) }, r.status)))));
+  table.append(tb);
+  const wrap = el("div", {},
+    el("p", { class: "info" }, `✅ Tạo mới: ${res.created} · ⚠ Bỏ qua/Lỗi: ${res.failed}`),
+    el("div", { class: "table-wrap" }, table));
+  showModal("Kết quả nhập hàng loạt", wrap, { wide: true });
 }
 
 async function openOutbox() {
