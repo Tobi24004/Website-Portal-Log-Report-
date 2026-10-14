@@ -189,7 +189,8 @@ async function startApp() {
 async function continueApp() {
   await loadCatalog();
   renderSidebar();
-  navigate("report");
+  // Đặt mốc lịch sử ban đầu (replace) để Back lùi trong app thay vì thoát web.
+  navigate("report", { record: "replace" });
 }
 
 function resetIdle() {
@@ -234,7 +235,15 @@ function navItem(label, view) {
   }, label);
 }
 
-function navigate(view) {
+// Trạng thái điều hướng để lưu vào lịch sử trình duyệt (cho nút Back/Forward).
+function navState() { return { app: true, view: State.view, templateId: State.currentTemplate?.templateId || null }; }
+function record(mode) {
+  if (mode === "push") history.pushState(navState(), "");
+  else if (mode === "replace") history.replaceState(navState(), "");
+  // "none" -> không đụng lịch sử (dùng khi khôi phục từ popstate)
+}
+
+function navigate(view, { record: rec = "push" } = {}) {
   // Bấm "Báo cáo" luôn về trang chính (bỏ báo cáo đang mở).
   if (view === "report") { State.currentTemplate = null; State.result = null; }
   State.view = view;
@@ -242,15 +251,25 @@ function navigate(view) {
   if (view === "report") renderReportHome();
   else if (view === "history") renderHistory();
   else if (view === "admin") renderAdmin();
+  record(rec);
 }
 
 /* Về trang chính danh mục báo cáo (dùng cho nút quay lại). */
-function goReportHome() {
+function goReportHome(rec = "push") {
   State.currentTemplate = null; State.result = null; State.view = "report";
   renderSidebar();
   renderReportHome();
   window.scrollTo(0, 0);
+  record(rec);
 }
+
+// Nút Back/Forward của trình duyệt -> khôi phục trang trong app (không thoát web).
+window.addEventListener("popstate", (e) => {
+  if (!State.user) return;   // chưa đăng nhập -> để trình duyệt tự xử lý
+  const st = (e.state && e.state.app) ? e.state : { view: "report", templateId: null };
+  if (st.view === "report" && st.templateId) openTemplate(st.templateId, { record: "none" });
+  else navigate(st.view || "report", { record: "none" });
+});
 
 /* ---------------- Report ---------------- */
 function renderReportHome() {
@@ -337,14 +356,16 @@ function emptyState(ico, msg, hint) {
     hint ? el("div", { class: "hint" }, hint) : null);
 }
 
-async function openTemplate(id) {
+async function openTemplate(id, { record: rec = "push" } = {}) {
   const c = $("#content");
   c.innerHTML = '<p class="muted"><span class="spinner"></span> Đang tải báo cáo…</p>';
   try {
     State.currentTemplate = await api("/api/catalog/templates/" + id);
     State.result = null; State.pendingParams = null;
+    State.view = "report";
     renderSidebar();
     renderTemplate(State.currentTemplate);
+    record(rec);
   } catch (ex) {
     c.innerHTML = `<div class="alert err">${esc(ex.message)}</div>`;
   }
@@ -797,6 +818,7 @@ async function rerunFromHistory(execId) {
     renderSidebar();
     renderTemplate(detail, info.parameters);
     window.scrollTo(0, 0);
+    record("push");
   } catch (ex) { toast(ex.message || "Không thể chạy lại.", "err"); }
 }
 
